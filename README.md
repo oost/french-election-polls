@@ -1,25 +1,26 @@
 # French Presidential Elections — First-Round Polling Analysis
 
 Polars-powered analysis of opinion polls for the last five French presidential
-elections (2002, 2007, 2012, 2017, 2022). Polls are scraped from Wikipedia,
-LOESS-smoothed, and plotted alongside the actual first-round result for each
-candidate.
+elections (2002, 2007, 2012, 2017, 2022). Polls are parsed from pinned
+Wikipedia revisions, cleaned to one row per national poll, smoothed over time,
+and plotted alongside the actual first-round result for each candidate.
 
 ## Layout
 
 | File | What it does |
 | --- | --- |
-| [`french_elections_polls.ipynb`](french_elections_polls.ipynb) | Notebook: download → process → chart. Configuration only; logic lives in the helpers module. |
-| [`polls_helpers.py`](polls_helpers.py) | All parsing, processing, and plotting helpers. |
-| [`test_polls_helpers.py`](test_polls_helpers.py) | Pytest suite covering parsing edge cases, row validation, the data-pipeline path with mocked Wikipedia tables, and the relative-day analysis. |
-| [`polling_data/`](polling_data/) | CSV exports written by the notebook (one per election year). |
+| [`french_elections_polls.ipynb`](french_elections_polls.ipynb) | Notebook: load → clean → chart. Configuration only; logic lives in the helpers module. |
+| [`polls_helpers.py`](polls_helpers.py) | All parsing, cleaning, smoothing, and plotting helpers. |
+| [`test_polls_helpers.py`](test_polls_helpers.py) | Pytest suite: unit tests on synthetic tables/pages plus regression tests on the cached Wikipedia snapshots. |
+| [`wiki_cache/`](wiki_cache/) | Gzipped HTML of the pinned Wikipedia revisions (`{year}_{revision}.html.gz`). |
+| [`polling_data/`](polling_data/) | Cleaned CSV exports written by the notebook (one per election year). |
 
 ## Running
 
 ```bash
 python -m venv venv
 source venv/bin/activate
-pip install polars pandas numpy matplotlib scipy statsmodels beautifulsoup4 lxml pytest
+pip install polars pandas numpy matplotlib beautifulsoup4 lxml pytest
 
 # tests
 pytest -q
@@ -28,11 +29,19 @@ pytest -q
 jupyter notebook french_elections_polls.ipynb
 ```
 
-The notebook auto-installs missing packages on first run.
+The notebook auto-installs missing packages on first run. Everything runs
+offline from `wiki_cache/`; a page is only downloaded if its cache file is
+missing.
+
+## Data source and reproducibility
+
+Each election's page is pinned to a revision in `WIKIPEDIA_REVISIONS`
+(`polls_helpers.py`). To pick up later edits to a page, bump its revision ID
+and delete the old cache file. The next run downloads the new revision.
 
 ## Configuration
 
-In the notebook's first code cell after the imports:
+In the notebook's configuration cell:
 
 ```python
 ELECTION_ROUND = 'first'   # 'first' or 'second'
@@ -42,53 +51,108 @@ TIME_CUTOFF    = '1y'      # '1y', '6m', '3m', '30d', or None for all polls
 For the *Polling Change Analysis* section:
 
 ```python
-START_DAYS = -150            # 150 days before the election
-END_DAYS   = None            # None → compare against the actual first-round result
-                             # or set to e.g. -30 to compare two LOESS-smoothed days
+START_DAYS = -days_until_next_election()   # as far out as 2027 is today
+END_DAYS   = None   # None → split into poll movement + final polling error
+                    # or e.g. -30 to compare two smoothed days
 ```
+
+The default start day is recomputed on every run from `NEXT_ELECTION_DATE`
+(the 2027 first round, 18 April 2027), so past campaigns are compared from the
+point the 2027 race has reached. Set `START_DAYS` to a fixed number (e.g.
+`-365`) to override it.
+
+Module-level knobs in `polls_helpers.py`: `MIN_SUPPORT_PCT` (charting
+threshold, 1 %), `SMOOTHING_BANDWIDTH_DAYS` (10), `MIN_EFFECTIVE_POLLS` (2),
+and `FINAL_POLL_DAY` (−2).
+
+## How polls are cleaned
+
+1. **National tables only.** Tables are classified by their Wikipedia section
+   heading ("First round" / "Second round"). Tables under *By region*, *By
+   department*, *By commune* or *By first round vote* are excluded. Those are
+   local polls or vote-transfer crosstabs, not national voting intention.
+2. **Candidates who ran.** Columns are matched for every candidate on the
+   first-round ballot (the keys of `FIRST_ROUND_RESULTS`). Surnames are matched
+   as whole words after repairing headers that Wikipedia wraps across lines
+   (e.g. "Dupont- Aignan").
+3. **Row checks.** First-round rows need 3+ candidates with each value ≤ 50 %
+   and the total ≤ 105 %. Second-round rows must come from a table containing
+   exactly the two finalists, with shares summing to about 100 %. Rows that
+   report a previous election's result ("2017 election") are dropped, as are
+   polls whose fieldwork ended on or after election day.
+4. **One row per poll.** Wikipedia lists a poll once per hypothetical lineup
+   (e.g. with Bertrand instead of Pécresse, or with Villepin instead of
+   Sarkozy). Rows sharing pollster, fieldwork dates and sample size are
+   collapsed to the lineup closest to the real ballot. That is the one with the
+   most actual candidates, then the largest combined share for them.
+   `n_scenarios` records how many lineups the poll tested.
+5. **Dates.** A poll is placed at its fieldwork midpoint. `fieldwork_start`
+   and `fieldwork_end` are kept.
+6. **Weights.** Rolling trackers publish daily from overlapping samples. A
+   poll's `weight` is its fieldwork length divided by the total days of
+   same-pollster fieldwork overlapping it. Independent polls get 1, and a daily
+   4-day rolling tracker gets ≈ ¼ per release.
+
+The CSV columns are `date, fieldwork_start, fieldwork_end, pollster,
+sample_size, n_scenarios, weight`, then one column per candidate, then `year`.
+
+## Smoothing
+
+Trends use a weighted local-linear regression with a Gaussian kernel in
+**time** (SD 10 days). The window is equally wide throughout the campaign,
+whether polls are sparse a year out or daily in the final weeks. Where the
+kernel-weighted poll count falls below 2, no value is reported. Lines show
+gaps there, and change analyses list the candidate as *not polled* rather
+than extrapolating from distant polls.
 
 ## What the charts show
 
 For each year (1-year window before the election by default):
 
-- **Faded scatter** — every individual poll for each candidate.
-- **Solid line** — LOESS-smoothed trend.
-- **Solid filled circle on the election date** — the actual first-round
-  result, with the candidate's name and percentage labeled to the right.
+- **Faded dots**: individual polls. Dot size scales with poll weight, so
+  overlapping tracker releases look lighter.
+- **Solid line**: the time-smoothed trend.
+- **Ringed dot on election day**: the actual result, direct-labeled with the
+  candidate's name and percentage.
 
-Candidates are color-coded by political family (far-left red, socialist
-pink, ecologist green, centrist gold, right blue, far-right navy).
+Candidates are charted when their actual result, or their weighted polling
+average over the final 30 days, exceeds 1 %.
 
-## How polls are filtered
+Colors follow political families (far left reds, socialist pinks, ecologist
+greens, centre golds, right blues, far right navy/purple). Each candidate gets
+a distinct shade. Within every election, all pairs of charted candidates
+differ by OKLab ΔE ≥ 15, and every color has ≥ 3:1 contrast on white.
+With up to 15 candidates on one chart, color-blind separation can't be
+guaranteed. The election-day direct labels and the legend carry identity.
 
-1. **Table detection** — Wikipedia tables are kept only if they contain a
-   "Polling firm" / "Polling organisation" column and a date/fieldwork column.
-2. **Row validation** — first-round rows need 3+ candidate values, all in
-   the 0.5–40 % band. The 40 % ceiling rejects head-to-head columns that
-   sometimes appear in the same tables (e.g., "Macron vs Mélenchon" projections).
-3. **Date boundary** — polls dated on or after the election date are
-   discarded (exit polls and post-election projections leak into the
-   Wikipedia tables for some years).
-4. **Mean threshold** — after extraction, candidates whose mean polling is
-   ≤ `MIN_MEAN_POLL_PCT` (default 1.0 %) are dropped from the chart.
+The **polling change** chart splits each candidate's change from `START_DAYS`
+to the result into:
+
+- **poll movement**: smoothed support at `START_DAYS` → final polls
+  (two days out; French law bars publishing polls on the eve and day of the
+  vote);
+- **final polling error**: final polls → actual result;
+- a marker for the **net change**.
+
+The **final polling error** table compares final smoothed polls with the
+result for every charted candidate.
 
 ## Tests
 
-The pytest suite uses synthetic / mocked Wikipedia tables, so it runs offline
-in well under a second. Coverage:
+`pytest -q` runs in a few seconds, offline:
 
-- `_extract_numeric` — None, NaN, zero, negatives, percent strings, dashes.
-- `parse_date` — ISO, "8 April 2022", abbreviated month, date ranges, NaN.
-- `parse_time_cutoff`, `filter_by_time_cutoff` — `1y` / `6m` / `30d` / `None`.
-- `is_valid_first_round_row`, `is_valid_second_round_row` — every accept/reject branch.
-- `extract_poll_records` — first-round table, second-round leak rejection,
-  empty / malformed tables.
-- `drop_low_polling_candidates` — threshold cutoff, protected columns.
-- `process_year_data` — date-boundary filter, low-poll drop, with an injected
-  fake fetcher.
-- `FIRST_ROUND_RESULTS` — every year present, winners match history, all
-  values in (0, 50 %], yearly totals ~100 %, every candidate kept in the lists
-  has a known result.
-- `create_relative_day_charts` — both `end_days=int` and `end_days=None`
-  modes, plus a numerical check that the bar height for `end_days=None`
-  equals `actual_result − LOESS_at_start`.
+- Parsing: numeric cells, sample sizes, fieldwork ranges (cross-month,
+  cross-year), pollster cleanup, header matching.
+- Section classification and row validation for both rounds.
+- Lineup collapsing, rolling-tracker weights, time-based smoothing (no
+  extrapolation, weights respected).
+- Chart-candidate selection, the movement + error decomposition, chart smoke
+  tests.
+- The full pipeline on a synthetic Wikipedia page (result rows, regional
+  tables, hypothetical lineups, second-round tables).
+- **Snapshot regressions** on `wiki_cache/`, per election:
+  - one row per poll;
+  - no row totals above 105 %;
+  - every candidate with ≥ 1 % of the vote is polled;
+  - final-poll mean absolute error < 1.5 pts;
+  - second-round rows sum to about 100 %.
