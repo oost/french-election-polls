@@ -1,9 +1,16 @@
-# French Presidential Elections — First-Round Polling Analysis
+# French Elections — Polling Analysis and Forecasts
 
 Polars-powered analysis of opinion polls for the last five French presidential
 elections (2002, 2007, 2012, 2017, 2022). Polls are parsed from pinned
 Wikipedia revisions, cleaned to one row per national poll, smoothed over time,
 and plotted alongside the actual first-round result for each candidate.
+
+The `forecast/` package adds probabilistic forecasts of the **2027
+presidential election** and the **next legislative election**. It replicates
+the FiftyPlusOne 2026 methodology: a polls model and a fundamentals model,
+stacked by out-of-sample precision, then an error meta-model and 40,000
+simulations. The design is in [`PLAN.md`](PLAN.md); how to run it is in
+[Forecast model](#forecast-model) below.
 
 ## Layout
 
@@ -14,6 +21,11 @@ and plotted alongside the actual first-round result for each candidate.
 | [`test_polls_helpers.py`](test_polls_helpers.py) | Pytest suite: unit tests on synthetic tables/pages plus regression tests on the cached Wikipedia snapshots. |
 | [`wiki_cache/`](wiki_cache/) | Gzipped HTML of the pinned Wikipedia revisions (`{year}_{revision}.html.gz`). |
 | [`polling_data/`](polling_data/) | Cleaned CSV exports written by the notebook (one per election year). |
+| [`forecast/`](forecast/) | Forecast model package (see below). |
+| [`forecast_2027.ipynb`](forecast_2027.ipynb) | Notebook: 2027 presidential and legislative forecasts plus backtest charts. Configuration only. |
+| [`config/model.yaml`](config/model.yaml) | Model parameters, each tagged with its provenance (post, law, assumption or estimated). |
+| [`data/reference/`](data/reference/) | Hand-curated inputs: candidates, pollsters, party→bloc maps, scenario files, priors. |
+| [`docs/`](docs/) | Model overview, file guide, and a Bayesian/Stan tutorial. `python docs/build_site.py` builds them into one HTML page, `docs/site/index.html`. |
 
 ## Running
 
@@ -156,3 +168,52 @@ result for every charted candidate.
   - every candidate with ≥ 1 % of the vote is polled;
   - final-poll mean absolute error < 1.5 pts;
   - second-round rows sum to about 100 %.
+
+## Forecast model
+
+### Running
+
+```bash
+pip install -e '.[stan,dev]'
+python -c 'import cmdstanpy; cmdstanpy.install_cmdstan()'   # once; builds CmdStan
+
+python -m forecast ingest                      # Wikipedia pages → data/processed/polls_long.parquet
+python -m forecast backtest --cycles 2002 2007 2012 2017 2022   # ≈ 40 min; writes data/archive/
+python -m forecast run --as-of 2026-09-28      # 2027 presidential forecast → data/outputs/
+python -m forecast legi-backtest               # legislative backtest, 2017–2024
+python -m forecast legi --as-of 2026-09-28     # next legislative election
+
+pytest -q            # fast offline suite
+pytest -m slow       # compile the Stan models and check they recover known parameters
+```
+
+`run` and `legi` use the ensemble and error meta-model when a backtest
+archive exists. Without one, `run` falls back to a polls-only forecast.
+Outputs are data, not code, and are gitignored: `data/raw`, `data/processed`,
+`data/cache`, `data/archive` and `data/outputs`.
+
+### Layout
+
+| Module | What it does |
+| --- | --- |
+| `forecast/ingest/` | Pinned pages ([`pages.yaml`](data/reference/pages.yaml)). Every lineup and runoff matchup goes into a long table, and event rows go into their own table. Also: pollster and candidate registries, legislative polls, and data.gouv.fr and Ministry results. |
+| `forecast/polls/` | Three-pass polling average: recency decay 3%→14% per day, 90-day window, cross-lineup trend, house effects kept at n/(n+5) and n/(n+20) with a historical prior, mode and population effects. Also: the nested-logit now-cast for unpolled lineups, and the horizon error model. |
+| `forecast/fundamentals/` | Stan softmax dynamic linear model with random-walk coefficients. Presidential predictors: bloc baseline, incumbency, experience, personal vote. |
+| `forecast/ensemble/` | Precision-weighted ensemble with a stacking multiplier chosen out of sample. |
+| `forecast/errors/` | Stan error meta-model: shared shocks with σ(h) = a + b·√h, an individual-error multiplier, and Student-t errors with ν = number of training cycles. |
+| `forecast/simulate/` | Lineup scenario mixture, the runoff transfer model, and the presidential simulator (antithetic draws). |
+| `forecast/legislative/` | Seat data, lean, lagged results and incumbency; seat now-cast; two-round rules, withdrawals and transfers; vote-pattern clusters; chunked 577-seat simulator; backtest. |
+| `forecast/backtest/` | Strict out-of-sample presidential backtest, with metrics and charts. |
+
+### Judgment inputs (set, date and disclose them)
+
+- [`scenarios_pres_2027.yaml`](data/reference/scenarios_pres_2027.yaml): the probability of each candidate lineup. For example, Le Pen or Bardella as RN candidate, the Socialist primary winner, and whether Attal runs.
+- [`scenarios_legi.yaml`](data/reference/scenarios_legi.yaml): the assumed legislative election date, united vs split left, the incumbents' re-run rate, and the turnout spread.
+
+### Known limitations
+
+These are listed in PLAN.md's deviations and in the results write-up. With
+only five presidential and three to four legislative training cycles, tails
+are wide and the early test cycles lean on
+[`priors.yaml`](data/reference/priors.yaml). Backtests condition on the actual
+ballot, because candidate declaration dates are not curated.

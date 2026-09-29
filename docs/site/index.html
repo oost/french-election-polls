@@ -1,0 +1,1380 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head><body>
+<title>French Election Forecast Guide</title>
+<meta name="description" content="How the FiftyPlusOne-style French election forecast works: model, files, and a Bayesian tutorial.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+:root {
+  --paper: #f6f7f9; --surface: #ffffff; --ink: #1b2130; --muted: #566074; --rule: #dde1e8;
+  --accent: #2b4bb1; --accent-soft: #e7ecfa; --mark: #b8322a; --code-bg: #f0f2f6;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #11141b; --surface: #181c25; --ink: #e5e8ef; --muted: #9aa3b4; --rule: #2a303d;
+    --accent: #93a9ff; --accent-soft: #1f2842; --mark: #ef7a70; --code-bg: #1d222c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #11141b; --surface: #181c25; --ink: #e5e8ef; --muted: #9aa3b4; --rule: #2a303d;
+  --accent: #93a9ff; --accent-soft: #1f2842; --mark: #ef7a70; --code-bg: #1d222c;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.62 var(--serif); }
+.shell { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3rem; max-width: 76rem;
+         margin: 0 auto; padding-inline: 24px; padding-block: 2rem 5rem; }
+nav.side { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 1.5rem); align-self: start;
+           max-height: calc(100vh - 3rem); overflow-y: auto; font-family: var(--sans); font-size: 14px; }
+.brand { display: grid; gap: .15rem; padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--rule); }
+.brand strong { font-size: 16px; font-weight: 600; letter-spacing: -.005em; }
+.brand span { color: var(--muted); font-size: 13px; }
+.tricolore { display: flex; height: 3px; width: 2.25rem; margin-bottom: .5rem; }
+.tricolore i { flex: 1; } .tricolore i:nth-child(1) { background: #2b4bb1; }
+.tricolore i:nth-child(2) { background: var(--rule); } .tricolore i:nth-child(3) { background: #c53a31; }
+nav.side ol { list-style: none; margin: 0; padding: 0; display: grid; gap: .1rem; }
+nav.side a { color: var(--muted); text-decoration: none; display: block; padding: .3rem .6rem; border-radius: 6px; }
+nav.side a:hover { color: var(--ink); background: var(--accent-soft); }
+nav.side a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+nav.side .toc { margin: .2rem 0 .6rem .6rem; border-left: 1px solid var(--rule); }
+nav.side .toc a { font-size: 13px; padding: .2rem .7rem; border-radius: 0 6px 6px 0; }
+.facts { margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--rule); display: grid; gap: .45rem;
+         font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.facts b { color: var(--ink); font-weight: 600; font-family: var(--mono); font-size: 12.5px; }
+main { min-width: 0; max-width: 46rem; }
+section.doc[hidden] { display: none !important; }
+h1, h2, h3 { font-family: var(--sans); line-height: 1.25; text-wrap: balance; color: var(--ink); }
+h1 { font-size: 2.05rem; font-weight: 600; letter-spacing: -.015em; margin: .2rem 0 1.2rem; }
+h2 { font-size: 1.4rem; font-weight: 600; margin: 2.8rem 0 .8rem; padding-top: .4rem; border-top: 1px solid var(--rule); }
+h3 { font-size: 1.08rem; font-weight: 600; margin: 2rem 0 .6rem; }
+p, li { max-width: 68ch; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.5rem 0; }
+strong { font-weight: 600; }
+code { font-family: var(--mono); font-size: .86em; background: var(--code-bg); padding: .1em .35em; border-radius: 4px; }
+.repo-path { font-family: var(--mono); font-size: .86em; color: var(--muted); }
+.codehilite { background: var(--code-bg); border-radius: 8px; overflow-x: auto; margin: 1.2rem 0; }
+.codehilite pre { margin: 0; padding: 1rem 1.1rem; font: 13.5px/1.55 var(--mono); }
+.codehilite code { background: none; padding: 0; font-size: inherit; }
+.table-wrap { overflow-x: auto; margin: 1.2rem 0; }
+table { border-collapse: collapse; font-family: var(--sans); font-size: 14.5px; line-height: 1.45; min-width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: .55rem .8rem .55rem 0; border-bottom: 1px solid var(--rule); }
+th { font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+td code { white-space: nowrap; }
+.math { overflow-x: auto; margin: 1.1rem 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+pre.mermaid { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 1rem;
+              overflow-x: auto; text-align: center; font-family: var(--sans); }
+blockquote { margin: 1.2rem 0; padding: .2rem 1rem; border-left: 3px solid var(--mark); color: var(--muted); }
+.pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3.5rem; padding-top: 1.2rem;
+         border-top: 1px solid var(--rule); font-family: var(--sans); font-size: 14px; flex-wrap: wrap; }
+.pager a { text-decoration: none; display: grid; gap: .1rem; }
+.pager a span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.pager a.next { text-align: right; margin-left: auto; }
+@media (max-width: 860px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; padding-inline: 16px; padding-block: 1rem 4rem; }
+  nav.side { position: static; max-height: none; }
+  nav.side .toc, .facts { display: none; }
+  nav.side > ol { display: flex; flex-wrap: wrap; gap: .3rem; }
+  body { font-size: 16px; }
+  h1 { font-size: 1.65rem; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
+pre { line-height: 125%; }
+td.linenos .normal { color: #666666; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #666666; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.codehilite .hll { background-color: #ffffcc }
+
+.codehilite .c { color: #60A0B0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #F00 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666 } /* Operator */
+.codehilite .ch { color: #60A0B0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60A0B0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60A0B0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60A0B0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60A0B0; background-color: #FFF0F0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.codehilite .gr { color: #F00 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888 } /* Generic.Output */
+.codehilite .gp { color: #C65D09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #04D } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40A070 } /* Literal.Number */
+.codehilite .s { color: #4070A0 } /* Literal.String */
+.codehilite .na { color: #4070A0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0E84B5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60ADD5 } /* Name.Constant */
+.codehilite .nd { color: #555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #D55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287E } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0E84B5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #BB60D5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #BBB } /* Text.Whitespace */
+.codehilite .mb { color: #40A070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40A070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40A070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40A070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40A070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070A0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070A0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070A0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070A0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070A0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070A0 } /* Literal.String.Double */
+.codehilite .se { color: #4070A0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070A0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70A0D0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #C65D09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070A0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287E } /* Name.Function.Magic */
+.codehilite .vc { color: #BB60D5 } /* Name.Variable.Class */
+.codehilite .vg { color: #BB60D5 } /* Name.Variable.Global */
+.codehilite .vi { color: #BB60D5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #BB60D5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40A070 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) .codehilite .hll { background-color: #6e7681 }
+:root:not([data-theme="light"]) .codehilite { background: #0d1117; color: #E6EDF3 }
+:root:not([data-theme="light"]) .codehilite .c { color: #8B949E; font-style: italic } /* Comment */
+:root:not([data-theme="light"]) .codehilite .err { color: #F85149 } /* Error */
+:root:not([data-theme="light"]) .codehilite .esc { color: #E6EDF3 } /* Escape */
+:root:not([data-theme="light"]) .codehilite .g { color: #E6EDF3 } /* Generic */
+:root:not([data-theme="light"]) .codehilite .k { color: #FF7B72 } /* Keyword */
+:root:not([data-theme="light"]) .codehilite .l { color: #A5D6FF } /* Literal */
+:root:not([data-theme="light"]) .codehilite .n { color: #E6EDF3 } /* Name */
+:root:not([data-theme="light"]) .codehilite .o { color: #FF7B72; font-weight: bold } /* Operator */
+:root:not([data-theme="light"]) .codehilite .x { color: #E6EDF3 } /* Other */
+:root:not([data-theme="light"]) .codehilite .p { color: #E6EDF3 } /* Punctuation */
+:root:not([data-theme="light"]) .codehilite .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+:root:not([data-theme="light"]) .codehilite .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+:root:not([data-theme="light"]) .codehilite .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+:root:not([data-theme="light"]) .codehilite .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+:root:not([data-theme="light"]) .codehilite .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+:root:not([data-theme="light"]) .codehilite .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+:root:not([data-theme="light"]) .codehilite .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+:root:not([data-theme="light"]) .codehilite .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+:root:not([data-theme="light"]) .codehilite .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+:root:not([data-theme="light"]) .codehilite .gr { color: #FFA198 } /* Generic.Error */
+:root:not([data-theme="light"]) .codehilite .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+:root:not([data-theme="light"]) .codehilite .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+:root:not([data-theme="light"]) .codehilite .go { color: #8B949E } /* Generic.Output */
+:root:not([data-theme="light"]) .codehilite .gp { color: #8B949E } /* Generic.Prompt */
+:root:not([data-theme="light"]) .codehilite .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+:root:not([data-theme="light"]) .codehilite .gu { color: #79C0FF } /* Generic.Subheading */
+:root:not([data-theme="light"]) .codehilite .gt { color: #FF7B72 } /* Generic.Traceback */
+:root:not([data-theme="light"]) .codehilite .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+:root:not([data-theme="light"]) .codehilite .kc { color: #79C0FF } /* Keyword.Constant */
+:root:not([data-theme="light"]) .codehilite .kd { color: #FF7B72 } /* Keyword.Declaration */
+:root:not([data-theme="light"]) .codehilite .kn { color: #FF7B72 } /* Keyword.Namespace */
+:root:not([data-theme="light"]) .codehilite .kp { color: #79C0FF } /* Keyword.Pseudo */
+:root:not([data-theme="light"]) .codehilite .kr { color: #FF7B72 } /* Keyword.Reserved */
+:root:not([data-theme="light"]) .codehilite .kt { color: #FF7B72 } /* Keyword.Type */
+:root:not([data-theme="light"]) .codehilite .ld { color: #79C0FF } /* Literal.Date */
+:root:not([data-theme="light"]) .codehilite .m { color: #A5D6FF } /* Literal.Number */
+:root:not([data-theme="light"]) .codehilite .s { color: #A5D6FF } /* Literal.String */
+:root:not([data-theme="light"]) .codehilite .na { color: #E6EDF3 } /* Name.Attribute */
+:root:not([data-theme="light"]) .codehilite .nb { color: #E6EDF3 } /* Name.Builtin */
+:root:not([data-theme="light"]) .codehilite .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+:root:not([data-theme="light"]) .codehilite .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+:root:not([data-theme="light"]) .codehilite .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+:root:not([data-theme="light"]) .codehilite .ni { color: #FFA657 } /* Name.Entity */
+:root:not([data-theme="light"]) .codehilite .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+:root:not([data-theme="light"]) .codehilite .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+:root:not([data-theme="light"]) .codehilite .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+:root:not([data-theme="light"]) .codehilite .nn { color: #FF7B72 } /* Name.Namespace */
+:root:not([data-theme="light"]) .codehilite .nx { color: #E6EDF3 } /* Name.Other */
+:root:not([data-theme="light"]) .codehilite .py { color: #79C0FF } /* Name.Property */
+:root:not([data-theme="light"]) .codehilite .nt { color: #7EE787 } /* Name.Tag */
+:root:not([data-theme="light"]) .codehilite .nv { color: #79C0FF } /* Name.Variable */
+:root:not([data-theme="light"]) .codehilite .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+:root:not([data-theme="light"]) .codehilite .pm { color: #E6EDF3 } /* Punctuation.Marker */
+:root:not([data-theme="light"]) .codehilite .w { color: #6E7681 } /* Text.Whitespace */
+:root:not([data-theme="light"]) .codehilite .mb { color: #A5D6FF } /* Literal.Number.Bin */
+:root:not([data-theme="light"]) .codehilite .mf { color: #A5D6FF } /* Literal.Number.Float */
+:root:not([data-theme="light"]) .codehilite .mh { color: #A5D6FF } /* Literal.Number.Hex */
+:root:not([data-theme="light"]) .codehilite .mi { color: #A5D6FF } /* Literal.Number.Integer */
+:root:not([data-theme="light"]) .codehilite .mo { color: #A5D6FF } /* Literal.Number.Oct */
+:root:not([data-theme="light"]) .codehilite .sa { color: #79C0FF } /* Literal.String.Affix */
+:root:not([data-theme="light"]) .codehilite .sb { color: #A5D6FF } /* Literal.String.Backtick */
+:root:not([data-theme="light"]) .codehilite .sc { color: #A5D6FF } /* Literal.String.Char */
+:root:not([data-theme="light"]) .codehilite .dl { color: #79C0FF } /* Literal.String.Delimiter */
+:root:not([data-theme="light"]) .codehilite .sd { color: #A5D6FF } /* Literal.String.Doc */
+:root:not([data-theme="light"]) .codehilite .s2 { color: #A5D6FF } /* Literal.String.Double */
+:root:not([data-theme="light"]) .codehilite .se { color: #79C0FF } /* Literal.String.Escape */
+:root:not([data-theme="light"]) .codehilite .sh { color: #79C0FF } /* Literal.String.Heredoc */
+:root:not([data-theme="light"]) .codehilite .si { color: #A5D6FF } /* Literal.String.Interpol */
+:root:not([data-theme="light"]) .codehilite .sx { color: #A5D6FF } /* Literal.String.Other */
+:root:not([data-theme="light"]) .codehilite .sr { color: #79C0FF } /* Literal.String.Regex */
+:root:not([data-theme="light"]) .codehilite .s1 { color: #A5D6FF } /* Literal.String.Single */
+:root:not([data-theme="light"]) .codehilite .ss { color: #A5D6FF } /* Literal.String.Symbol */
+:root:not([data-theme="light"]) .codehilite .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+:root:not([data-theme="light"]) .codehilite .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+:root:not([data-theme="light"]) .codehilite .vc { color: #79C0FF } /* Name.Variable.Class */
+:root:not([data-theme="light"]) .codehilite .vg { color: #79C0FF } /* Name.Variable.Global */
+:root:not([data-theme="light"]) .codehilite .vi { color: #79C0FF } /* Name.Variable.Instance */
+:root:not([data-theme="light"]) .codehilite .vm { color: #79C0FF } /* Name.Variable.Magic */
+:root:not([data-theme="light"]) .codehilite .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+:root[data-theme="dark"] .codehilite .hll { background-color: #6e7681 }
+:root[data-theme="dark"] .codehilite { background: #0d1117; color: #E6EDF3 }
+:root[data-theme="dark"] .codehilite .c { color: #8B949E; font-style: italic } /* Comment */
+:root[data-theme="dark"] .codehilite .err { color: #F85149 } /* Error */
+:root[data-theme="dark"] .codehilite .esc { color: #E6EDF3 } /* Escape */
+:root[data-theme="dark"] .codehilite .g { color: #E6EDF3 } /* Generic */
+:root[data-theme="dark"] .codehilite .k { color: #FF7B72 } /* Keyword */
+:root[data-theme="dark"] .codehilite .l { color: #A5D6FF } /* Literal */
+:root[data-theme="dark"] .codehilite .n { color: #E6EDF3 } /* Name */
+:root[data-theme="dark"] .codehilite .o { color: #FF7B72; font-weight: bold } /* Operator */
+:root[data-theme="dark"] .codehilite .x { color: #E6EDF3 } /* Other */
+:root[data-theme="dark"] .codehilite .p { color: #E6EDF3 } /* Punctuation */
+:root[data-theme="dark"] .codehilite .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+:root[data-theme="dark"] .codehilite .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+:root[data-theme="dark"] .codehilite .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+:root[data-theme="dark"] .codehilite .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+:root[data-theme="dark"] .codehilite .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+:root[data-theme="dark"] .codehilite .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+:root[data-theme="dark"] .codehilite .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+:root[data-theme="dark"] .codehilite .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+:root[data-theme="dark"] .codehilite .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+:root[data-theme="dark"] .codehilite .gr { color: #FFA198 } /* Generic.Error */
+:root[data-theme="dark"] .codehilite .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+:root[data-theme="dark"] .codehilite .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+:root[data-theme="dark"] .codehilite .go { color: #8B949E } /* Generic.Output */
+:root[data-theme="dark"] .codehilite .gp { color: #8B949E } /* Generic.Prompt */
+:root[data-theme="dark"] .codehilite .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+:root[data-theme="dark"] .codehilite .gu { color: #79C0FF } /* Generic.Subheading */
+:root[data-theme="dark"] .codehilite .gt { color: #FF7B72 } /* Generic.Traceback */
+:root[data-theme="dark"] .codehilite .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+:root[data-theme="dark"] .codehilite .kc { color: #79C0FF } /* Keyword.Constant */
+:root[data-theme="dark"] .codehilite .kd { color: #FF7B72 } /* Keyword.Declaration */
+:root[data-theme="dark"] .codehilite .kn { color: #FF7B72 } /* Keyword.Namespace */
+:root[data-theme="dark"] .codehilite .kp { color: #79C0FF } /* Keyword.Pseudo */
+:root[data-theme="dark"] .codehilite .kr { color: #FF7B72 } /* Keyword.Reserved */
+:root[data-theme="dark"] .codehilite .kt { color: #FF7B72 } /* Keyword.Type */
+:root[data-theme="dark"] .codehilite .ld { color: #79C0FF } /* Literal.Date */
+:root[data-theme="dark"] .codehilite .m { color: #A5D6FF } /* Literal.Number */
+:root[data-theme="dark"] .codehilite .s { color: #A5D6FF } /* Literal.String */
+:root[data-theme="dark"] .codehilite .na { color: #E6EDF3 } /* Name.Attribute */
+:root[data-theme="dark"] .codehilite .nb { color: #E6EDF3 } /* Name.Builtin */
+:root[data-theme="dark"] .codehilite .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+:root[data-theme="dark"] .codehilite .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+:root[data-theme="dark"] .codehilite .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+:root[data-theme="dark"] .codehilite .ni { color: #FFA657 } /* Name.Entity */
+:root[data-theme="dark"] .codehilite .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+:root[data-theme="dark"] .codehilite .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+:root[data-theme="dark"] .codehilite .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+:root[data-theme="dark"] .codehilite .nn { color: #FF7B72 } /* Name.Namespace */
+:root[data-theme="dark"] .codehilite .nx { color: #E6EDF3 } /* Name.Other */
+:root[data-theme="dark"] .codehilite .py { color: #79C0FF } /* Name.Property */
+:root[data-theme="dark"] .codehilite .nt { color: #7EE787 } /* Name.Tag */
+:root[data-theme="dark"] .codehilite .nv { color: #79C0FF } /* Name.Variable */
+:root[data-theme="dark"] .codehilite .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+:root[data-theme="dark"] .codehilite .pm { color: #E6EDF3 } /* Punctuation.Marker */
+:root[data-theme="dark"] .codehilite .w { color: #6E7681 } /* Text.Whitespace */
+:root[data-theme="dark"] .codehilite .mb { color: #A5D6FF } /* Literal.Number.Bin */
+:root[data-theme="dark"] .codehilite .mf { color: #A5D6FF } /* Literal.Number.Float */
+:root[data-theme="dark"] .codehilite .mh { color: #A5D6FF } /* Literal.Number.Hex */
+:root[data-theme="dark"] .codehilite .mi { color: #A5D6FF } /* Literal.Number.Integer */
+:root[data-theme="dark"] .codehilite .mo { color: #A5D6FF } /* Literal.Number.Oct */
+:root[data-theme="dark"] .codehilite .sa { color: #79C0FF } /* Literal.String.Affix */
+:root[data-theme="dark"] .codehilite .sb { color: #A5D6FF } /* Literal.String.Backtick */
+:root[data-theme="dark"] .codehilite .sc { color: #A5D6FF } /* Literal.String.Char */
+:root[data-theme="dark"] .codehilite .dl { color: #79C0FF } /* Literal.String.Delimiter */
+:root[data-theme="dark"] .codehilite .sd { color: #A5D6FF } /* Literal.String.Doc */
+:root[data-theme="dark"] .codehilite .s2 { color: #A5D6FF } /* Literal.String.Double */
+:root[data-theme="dark"] .codehilite .se { color: #79C0FF } /* Literal.String.Escape */
+:root[data-theme="dark"] .codehilite .sh { color: #79C0FF } /* Literal.String.Heredoc */
+:root[data-theme="dark"] .codehilite .si { color: #A5D6FF } /* Literal.String.Interpol */
+:root[data-theme="dark"] .codehilite .sx { color: #A5D6FF } /* Literal.String.Other */
+:root[data-theme="dark"] .codehilite .sr { color: #79C0FF } /* Literal.String.Regex */
+:root[data-theme="dark"] .codehilite .s1 { color: #A5D6FF } /* Literal.String.Single */
+:root[data-theme="dark"] .codehilite .ss { color: #A5D6FF } /* Literal.String.Symbol */
+:root[data-theme="dark"] .codehilite .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+:root[data-theme="dark"] .codehilite .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+:root[data-theme="dark"] .codehilite .vc { color: #79C0FF } /* Name.Variable.Class */
+:root[data-theme="dark"] .codehilite .vg { color: #79C0FF } /* Name.Variable.Global */
+:root[data-theme="dark"] .codehilite .vi { color: #79C0FF } /* Name.Variable.Instance */
+:root[data-theme="dark"] .codehilite .vm { color: #79C0FF } /* Name.Variable.Magic */
+:root[data-theme="dark"] .codehilite .il { color: #A5D6FF } /* Literal.Number.Integer.Long */</style>
+<div class="shell">
+  <nav class="side" aria-label="Documentation">
+    <div class="brand"><div class="tricolore" aria-hidden="true"><i></i><i></i><i></i></div>
+      <strong>French election forecast</strong><span>Model documentation</span></div>
+    <ol><li><a href="#home">Start here</a><ol class="toc" data-doc="home"><li><a href="#home-quick-reference">Quick reference</a></li></ol></li><li><a href="#overview">Model overview</a><ol class="toc" data-doc="overview"><li><a href="#overview-the-idea-in-one-paragraph">The idea in one paragraph</a></li><li><a href="#overview-pipeline">Pipeline</a></li><li><a href="#overview-stage-1-ingest-from-web-tables-to-a-long-table">Stage 1 — Ingest: from web tables to a long table</a></li><li><a href="#overview-stage-2-the-polling-average-three-passes">Stage 2 — The polling average (three passes)</a></li><li><a href="#overview-stage-3-now-cast-for-lineups-nobody-polled">Stage 3 — Now-cast for lineups nobody polled</a></li><li><a href="#overview-stage-4-how-far-the-average-can-still-move">Stage 4 — How far the average can still move</a></li><li><a href="#overview-stage-5-fundamentals-a-second-opinion-from-history">Stage 5 — Fundamentals (a second opinion from history)</a></li><li><a href="#overview-stage-6-ensemble">Stage 6 — Ensemble</a></li><li><a href="#overview-stage-7-error-meta-model">Stage 7 — Error meta-model</a></li><li><a href="#overview-stage-8-simulation">Stage 8 — Simulation</a></li><li><a href="#overview-stage-9-backtesting-no-time-travel">Stage 9 — Backtesting ("no time travel")</a></li><li><a href="#overview-what-is-judgment-rather-than-data">What is judgment rather than data</a></li><li><a href="#overview-known-limitations">Known limitations</a></li></ol></li><li><a href="#tutorial">Bayesian tutorial</a><ol class="toc" data-doc="tutorial"><li><a href="#tutorial-1-bayes-in-one-page">1. Bayes in one page</a></li><li><a href="#tutorial-2-shrinkage">2. Shrinkage</a></li><li><a href="#tutorial-3-hierarchical-models-and-partial-pooling">3. Hierarchical models and partial pooling</a></li><li><a href="#tutorial-4-choosing-the-scale-logs-softmax-and-the-dirichlet">4. Choosing the scale: logs, softmax and the Dirichlet</a></li><li><a href="#tutorial-5-letting-coefficients-drift-random-walks">5. Letting coefficients drift: random walks</a></li><li><a href="#tutorial-6-the-fundamentals-model-in-stan-line-by-line">6. The fundamentals model in Stan, line by line</a></li><li><a href="#tutorial-7-how-stan-fits-a-model-mcmc-and-nuts">7. How Stan fits a model: MCMC and NUTS</a></li><li><a href="#tutorial-8-the-error-meta-model-variance-components-and-fat-tails">8. The error meta-model: variance components and fat tails</a></li><li><a href="#tutorial-9-from-posterior-to-forecast-simulation">9. From posterior to forecast: simulation</a></li><li><a href="#tutorial-10-combining-models-precision-weighting-and-stacking">10. Combining models: precision weighting and stacking</a></li><li><a href="#tutorial-11-checking-a-probabilistic-forecast">11. Checking a probabilistic forecast</a></li><li><a href="#tutorial-12-try-it-yourself">12. Try it yourself</a></li></ol></li><li><a href="#files">File guide</a><ol class="toc" data-doc="files"><li><a href="#files-top-level">Top level</a></li><li><a href="#files-inputs-you-edit-datareference">Inputs you edit — data/reference/</a></li><li><a href="#files-generated-data-gitignored">Generated data (gitignored)</a></li><li><a href="#files-the-forecast-package">The forecast package</a></li><li><a href="#files-tests-testsforecast">Tests — tests/forecast/</a></li></ol></li></ol>
+    <div class="facts" aria-label="Model at a glance">
+      <div><b>40,000</b> simulations per forecast</div>
+      <div><b>5</b> presidential training cycles, 2002–2022</div>
+      <div><b>ν = 5</b> Student-t degrees of freedom</div>
+      <div><b>577</b> constituencies · majority <b>289</b></div>
+      <div><b>n/(n+5)</b> house-effect shrinkage</div>
+    </div>
+  </nav>
+  <main><section class="doc" id="home" aria-label="Documentation"><h1 id="home-documentation">Documentation</h1>
+<p>The code in <code>forecast/</code> forecasts French presidential and legislative elections. It follows the method of the FiftyPlusOne 2026 US forecast; <span class="repo-path"><code>PLAN.md</code></span> records the design decisions and every place this implementation departs from that method.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Read it to…</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#overview">Model overview</a></td>
+<td>Follow the whole pipeline, from Wikipedia tables to "Le Pen wins 49%", and see what each stage assumes.</td>
+</tr>
+<tr>
+<td><a href="#files">File guide</a></td>
+<td>Find the file that does something, and see which inputs you are expected to edit.</td>
+</tr>
+<tr>
+<td><a href="#tutorial">Bayesian modelling and Stan: a tutorial</a></td>
+<td>Learn the ideas the model relies on (priors, shrinkage, hierarchical models, random walks, MCMC, Stan, calibration), using this project's own models as the examples.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The tutorial assumes you know regression, distributions and maximum likelihood, but no Bayesian statistics. If that describes you, read the overview first, then the tutorial, and keep the file guide open while reading the code.</p>
+<h2 id="home-quick-reference">Quick reference</h2>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>forecast<span class="w"> </span>ingest<span class="w">                 </span><span class="c1"># rebuild the poll tables from the cached Wikipedia pages</span>
+python<span class="w"> </span>-m<span class="w"> </span>forecast<span class="w"> </span>backtest<span class="w"> </span>--cycles<span class="w"> </span><span class="m">2002</span><span class="w"> </span><span class="m">2007</span><span class="w"> </span><span class="m">2012</span><span class="w"> </span><span class="m">2017</span><span class="w"> </span><span class="m">2022</span><span class="w">   </span><span class="c1"># ≈ 40 min</span>
+python<span class="w"> </span>-m<span class="w"> </span>forecast<span class="w"> </span>run<span class="w"> </span>--as-of<span class="w"> </span><span class="m">2026</span>-09-28<span class="w"> </span><span class="c1"># 2027 presidential forecast</span>
+python<span class="w"> </span>-m<span class="w"> </span>forecast<span class="w"> </span>legi-backtest<span class="w">          </span><span class="c1"># legislative backtest</span>
+python<span class="w"> </span>-m<span class="w"> </span>forecast<span class="w"> </span>legi<span class="w"> </span>--as-of<span class="w"> </span><span class="m">2026</span>-09-28
+pytest<span class="w"> </span>-q<span class="w">                                 </span><span class="c1"># fast tests;  pytest -m slow  also fits the Stan models</span>
+</code></pre></div><nav class="pager" aria-label="Previous and next"><a class="next" href="#overview"><span>Next</span>Model overview</a></nav></section><section class="doc" id="overview" aria-label="Model overview"><h1 id="overview-model-overview">Model overview</h1>
+<p>This page follows the model from raw polls to probabilities, stage by stage. For each stage it says what it does, why, where the code is, and which numbers come from the FiftyPlusOne post and which were our own choices. <code>config/model.yaml</code> tags every parameter with its source: <code>post</code>, <code>law</code>, <code>assumption</code> or <code>estimated</code>.</p>
+<p>The statistics behind the stages (shrinkage, hierarchical models, random walks, MCMC, Student-t errors) are explained in the <a href="#tutorial">tutorial</a>.</p>
+<h2 id="overview-the-idea-in-one-paragraph">The idea in one paragraph</h2>
+<p>A poll is a noisy, biased measurement of an election that hasn't happened yet. The model does three things:</p>
+<ol>
+<li><strong>Clean the measurements.</strong> It combines polls into an average, correcting for pollster lean and for age.</li>
+<li><strong>Add a second, independent opinion.</strong> A "fundamentals" model predicts the result from history alone and knows nothing about current polls. Each opinion's weight depends on how accurate it has been out of sample.</li>
+<li><strong>Describe how wrong the combined estimate might be, then simulate.</strong> A model of its own past errors sets the size of the error. The election is then simulated 40,000 times, including the runoff. Probabilities are the fractions of simulations: "Le Pen wins 49%" means she won in 49% of them.</li>
+</ol>
+<h2 id="overview-pipeline">Pipeline</h2>
+<pre class="mermaid">flowchart TD
+    W[Wikipedia pages<br/>pinned revisions] --> L[Long poll table<br/>one row per poll × lineup × candidate]
+    L --> A[Three-pass polling average<br/>per lineup / runoff matchup]
+    A --> N[Now-cast for any lineup<br/>nested-logit substitution]
+    N --> P[Polls component<br/>mean + uncertainty]
+    H[(Past results<br/>1981–2022)] --> F[Fundamentals component<br/>Stan: softmax DLM]
+    P --> E[Ensemble<br/>precision weights + stacking]
+    F --> E
+    B[(Backtest archive:<br/>out-of-sample errors)] --> M[Error meta-model<br/>Stan]
+    B --> E
+    E --> S[40,000 simulations<br/>lineup draw → round 1 → runoff]
+    M --> S
+    Y[Scenario YAML<br/>judgment inputs] --> S
+    S --> O[Probabilities, intervals,<br/>matchups, bloc totals]
+</pre>
+
+<p>The two elections share the averaging, ensemble and error machinery. They differ in what a "race" is:</p>
+<ul>
+<li><strong>Presidential:</strong> a race is one national contest, per <em>lineup</em> in the first round and per <em>matchup</em> in the runoff.</li>
+<li><strong>Legislative:</strong> a race is one of 577 constituencies, and the national polls play the part of the post's "generic ballot".</li>
+</ul>
+<hr />
+<h2 id="overview-stage-1-ingest-from-web-tables-to-a-long-table">Stage 1 — Ingest: from web tables to a long table</h2>
+<p><strong>Code:</strong> <code>forecast/ingest/</code>.</p>
+<p>Poll data comes from English Wikipedia pages, pinned to one revision each so every run is reproducible. The pinned HTML is cached in <code>wiki_cache/</code>, so the pipeline runs offline.</p>
+<p><strong>Choosing tables.</strong> The rules in <code>data/reference/pages.yaml</code> decide which tables on a page to read. For example, the 2027 page's "Re-run of the 2022 election" tables are excluded, and the tables testing Bardella as RN candidate are included even though they sit under an odd heading.</p>
+<p><strong>One row per poll row × candidate.</strong> Each output row carries:</p>
+<ul>
+<li>the pollster, both as written and as a canonical firm name (so "Ifop-Fiducial" becomes Ifop);</li>
+<li>the fieldwork dates, sample size and survey mode;</li>
+<li>the <em>lineup</em>, meaning the set of candidates that row tested.</li>
+</ul>
+<p>French pollsters test several hypothetical fields in one survey (with Philippe; with Attal instead; with both). Each of those rows is kept as a separate lineup.</p>
+<p><strong>Rows removed:</strong></p>
+<ul>
+<li>previous results ("2022 election");</li>
+<li>timeline notes such as "Zemmour announces his candidacy", which go to an events table;</li>
+<li>polls in the field on or after election day;</li>
+<li>implausible rows.</li>
+</ul>
+<p><strong>Special cells:</strong></p>
+<ul>
+<li>A "&lt;1%" cell is stored as 0.5 and flagged.</li>
+<li>When one alliance figure spans several party columns in a legislative table (a merged cell), it is counted once.</li>
+</ul>
+<p><strong>Results data</strong> (for fundamentals and the legislative model) comes from two official sources:</p>
+<ul>
+<li>data.gouv.fr's harmonised polling-station results, for 1999–2026;</li>
+<li>the Ministry's per-constituency files for 2024, which the harmonised data lacks.</li>
+</ul>
+<h2 id="overview-stage-2-the-polling-average-three-passes">Stage 2 — The polling average (three passes)</h2>
+<p><strong>Code:</strong> <code>forecast/polls/weights.py</code>, <code>trend.py</code>, <code>house_effects.py</code> and <code>ewma.py</code>.</p>
+<p>This follows the post's § 3.1.1. Everything is done on the <strong>log-share scale</strong>: we work with log(share) and renormalise so the shares sum to 100%. That is the natural scale for a many-candidate race, for three reasons:</p>
+<ul>
+<li>a pollster "adding 2 points to RN" is closer to a proportional than an additive effect;</li>
+<li>errors of small and large candidates become comparable;</li>
+<li>renormalising (a softmax) always gives a valid set of shares.</li>
+</ul>
+<h3 id="overview-weights">Weights</h3>
+<p>Each poll gets a weight that is the product of four parts:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Formula</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Recency</td>
+<td>\((1-\delta_h)^{\text{age}}\), with \(\delta_h\) = 3%/day early, 14%/day in the last 14 days, and a linear ramp from 45 days out</td>
+<td>post (endpoints), assumption (ramp)</td>
+</tr>
+<tr>
+<td>Rolling-tracker overlap</td>
+<td>the share of this release's fieldwork days that no other release from the same tracker also covers</td>
+<td>French addition</td>
+</tr>
+<tr>
+<td>Sample size</td>
+<td>\(\sqrt{\min(n, 4000)/1000}\)</td>
+<td>assumption</td>
+</tr>
+<tr>
+<td>Partisan sponsor</td>
+<td>×½, plus a 2-point shift away from the sponsor</td>
+<td>post</td>
+</tr>
+</tbody>
+</table></div>
+<p>Only polls from the last 90 days count.</p>
+<h3 id="overview-trend">Trend</h3>
+<p>The trend is the counterpart of the post's generic-ballot adjustment. A poll from three weeks ago is moved by how much its candidate has moved since, measured across <em>all</em> lineups: \(\log y_{\text{adj}} = \log y + \theta_c(\text{today}) - \theta_c(\text{poll date})\).</p>
+<ul>
+<li>\(\theta_c\) is a local-linear kernel smooth of candidate \(c\)'s log shares.</li>
+<li>Lineup composition (a candidate polls lower in a crowded field) is absorbed by a lineup effect \(\lambda\).</li>
+<li>The trend is never extrapolated past a candidate's last poll; it is held flat. Without this, a candidate unpolled since July would follow July's slope into September.</li>
+</ul>
+<h3 id="overview-the-three-passes">The three passes</h3>
+<ol>
+<li><strong>Pass 1:</strong> a recency-weighted average of the trend-adjusted polls, per lineup and day.</li>
+<li><strong>Pass 2: house and mode effects.</strong> Each poll's residual is its difference from the pass-1 average of the <em>other</em> polls. From these residuals:
+   - Each firm's average residual per candidate is its lean. It is <strong>shrunk</strong> by \(n/(n+5)\), so five polls earn half credit.
+   - It is blended with the firm's lean in past cycles (older cycles count half as much), with the historical part capped at 10%.
+   - A lineup-specific extra is added back at \(n/(n+20)\).
+   - Effects are centred so the average firm has zero lean.</li>
+</ol>
+<p>Subtracting the effects and re-averaging gives the pass-2 average. Mode effects (phone vs online) are estimated the same way, by mode instead of firm.
+3. <strong>Pass 3:</strong> the same adjustment for the surveyed population (all adults, registered voters, likely voters). It is effectively a no-op in France, where polls report voters certain to vote.</p>
+<p>"Shrink by \(n/(n+k)\)" is the most important Bayesian idea in the whole model; the <a href="#tutorial-2-shrinkage">tutorial</a> derives it.</p>
+<p><strong>Check:</strong> two days before each election from 2002 to 2022, the pass-2 average's mean absolute error against the result is 1.0 point.</p>
+<h2 id="overview-stage-3-now-cast-for-lineups-nobody-polled">Stage 3 — Now-cast for lineups nobody polled</h2>
+<p><strong>Code:</strong> <code>forecast/polls/lineups.py</code>.</p>
+<p>This follows the post's § 3.1.2 (its now-cast for unpolled seats). A scenario can contain a lineup no pollster has tested exactly, for example Le Pen + Philippe + Attal + Glucksmann + Villepin. The model predicts it with a <strong>nested logit</strong>:</p>
+<div class="math">\[P(j) = P(\text{bloc } b)\cdot P(j\mid b),\qquad P(j\mid b)=\frac{e^{u_j/\mu_b}}{\sum_{k\in b}e^{u_k/\mu_b}}\]</div>
+<ul>
+<li>\(u_j\) is a candidate's strength.</li>
+<li>\(\mu_b\in(0,1]\) says how loyal a bloc's voters are: when one centrist drops out, what share goes to the other centrist rather than elsewhere?</li>
+<li>\(u\) and \(\mu\) are fitted to every race's current average; races tested side by side in one poll pin \(\mu\) down.</li>
+</ul>
+<p>Lineups that <em>were</em> polled are then anchored to their own average. The final estimate is the poll average plus the now-cast's disagreement with it, clipped to ±2 points with one poll, shrinking to ±⅓ point by five polls (post).</p>
+<p>The model's error on lineups it didn't see is estimated by leaving each race out in turn, and is added to the uncertainty of unpolled lineups.</p>
+<h2 id="overview-stage-4-how-far-the-average-can-still-move">Stage 4 — How far the average can still move</h2>
+<p><strong>Code:</strong> <code>forecast/polls/horizon.py</code>.</p>
+<p>This follows the post's § 3.1.3. Today's average isn't the election result. From the 2002–2022 backtest, the sd of (log result − log average) grows with the days \(h\) still to go and shrinks with candidate size:</p>
+<div class="math">\[\sigma(h,s)=(a+b\sqrt h)\,(s/10\%)^{-\gamma}\]</div>
+<p>The fitted values are about \(a = 0.14\), \(b = 0.031\) and \(\gamma = 0.26\). For a 15% candidate that gives roughly ±2.3 points two days out and ±6 points 200 days out. This is the polls component's stated uncertainty.</p>
+<p>We also tested a <em>vote utile</em> drift term, where leading candidates gain late. It made out-of-sample error worse (2.1 → 2.7 points), so it is off.</p>
+<h2 id="overview-stage-5-fundamentals-a-second-opinion-from-history">Stage 5 — Fundamentals (a second opinion from history)</h2>
+<p><strong>Code:</strong> <code>forecast/fundamentals/</code> and <code>forecast/stan/fundamentals_dlm.stan</code>.</p>
+<p>This follows the post's § 3.2. The component predicts first-round shares <strong>without any polls</strong>, from four predictors:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Predictor</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>log_baseline</code></td>
+<td>log of the candidate's bloc share in the last two presidential first rounds (80/20 weights), split among same-bloc candidates</td>
+</tr>
+<tr>
+<td><code>incumbency</code></td>
+<td>1 for a sitting president; ½ for a sitting PM or the governing party's nominee</td>
+</tr>
+<tr>
+<td><code>experience</code></td>
+<td>office grade 0–3, scaled to 0–1</td>
+</tr>
+<tr>
+<td><code>personal_vote</code></td>
+<td>how much the candidate beat or missed their baseline in earlier runs</td>
+</tr>
+</tbody>
+</table></div>
+<p>It is a multinomial-logit regression. Its coefficients are allowed to <strong>drift</strong> from one election to the next as a random walk, the "dynamic linear model" the post uses. It is fitted in Stan on the elections from 1995 to 2022; the <a href="#tutorial-6-the-fundamentals-model-in-stan-line-by-line">tutorial</a> walks through it line by line.</p>
+<p>For French presidential elections it is weak, with about 5.5 points of error. That is exactly why the next stage weights components by measured accuracy.</p>
+<h2 id="overview-stage-6-ensemble">Stage 6 — Ensemble</h2>
+<p><strong>Code:</strong> <code>forecast/ensemble/stacking.py</code>.</p>
+<p>This follows the post's § 4. Each component's out-of-sample error scale is fitted on the backtest archive with the same \((a+b\sqrt h)(s/10)^{-\gamma}\) form, and the weights are inverse variances, \(w_k\propto 1/\sigma_k^2\). A <strong>stacking</strong> multiplier is then chosen by trying values on earlier cycles and keeping the one that minimised out-of-sample error; for the fundamentals it came out at 0.25–0.5.</p>
+<p>Two adjustments come from the post:</p>
+<ul>
+<li>down-weight fundamentals when no incumbent runs;</li>
+<li>up-weight polls when a heavily polled race disagrees sharply with the fundamentals.</li>
+</ul>
+<p>The result is a mean per candidate, plus \(\bar\sigma=\sum_k w_k\sigma_k\) and a "disagreement" score. For 2027 the polls get about 87–96% of the weight.</p>
+<h2 id="overview-stage-7-error-meta-model">Stage 7 — Error meta-model</h2>
+<p><strong>Code:</strong> <code>forecast/errors/meta_model.py</code> and <code>forecast/stan/error_meta.stan</code>.</p>
+<p>This follows the post's § 4.1.1. Every backtest snapshot records its errors, err = log(result) − ensemble mean. A Bayesian model then splits those errors into two parts:</p>
+<ul>
+<li><strong>shared shocks</strong>, which move a whole group together. For the presidential model the group is a bloc. For the legislative model there are four levels: national bloc, region, département and vote-pattern cluster.</li>
+<li><strong>an individual error</strong>, whose size is the ensemble's stated \(\bar\sigma\) times a fitted multiplier. The multiplier grows where polls are scarce or the components disagree.</li>
+</ul>
+<p>Each level's sd follows \(a+b\sqrt{\text{days}}\). The likelihood is a Student-t with degrees of freedom ν equal to the number of training cycles. This is the post's way of admitting that thousands of rows still come from only a handful of elections, so large surprises must stay plausible.</p>
+<h2 id="overview-stage-8-simulation">Stage 8 — Simulation</h2>
+<p><strong>Code:</strong> <code>forecast/simulate/</code>.</p>
+<p>The presidential simulation repeats these steps 40,000 times.</p>
+<ol>
+<li><strong>Lineup.</strong> Draw one from <code>scenarios_pres_2027.yaml</code>: the RN candidate (Le Pen 95%), the Socialist primary winner, and whether optional candidates run.</li>
+<li><strong>Mid-campaign decisions.</strong> Draw the error that will have played out by 15 January 2027: about 43% of the total variance. Compute the January polls, then apply the centrist rule:
+   - if the leading centrist polls above 15%, they run alone;
+   - otherwise the top two, plus anyone above 10%, run.</li>
+<li><strong>First-round shares.</strong> Take the ensemble mean, add the rest of the error (shared bloc shocks plus individual shocks, all Student-t), then apply a softmax. Shocks are drawn in ± pairs (antithetic), so they average to exactly zero and never move the central estimate (post).</li>
+<li><strong>Round-one outcome.</strong> A candidate above 50% wins outright. Otherwise the top two go through.</li>
+<li><strong>Runoff.</strong>
+   - Start from the matchup's polling average, if one exists.
+   - Otherwise use a <strong>transfer model</strong>: each first-round electorate splits between the two finalists and abstention according to left–right distance and candidate appeal.
+   - Move the runoff mean with the simulated first round, so a first-round surprise carries into round two.
+   - Add a runoff error correlated with the finalists' first-round shocks.</li>
+</ol>
+<p>The outputs are the shares of simulations in which each thing happened:</p>
+<ul>
+<li>P(runs), P(reaches runoff) and P(wins), per candidate and pooled by bloc;</li>
+<li>vote-share quantiles;</li>
+<li>matchup probabilities;</li>
+<li>how often each outcome of the January decision occurred.</li>
+</ul>
+<p>The legislative simulation runs in chunks of 200 simulations at a time, to save memory. Each simulation goes through these steps.</p>
+<ol>
+<li><strong>Alliance scenario.</strong> Draw one from <code>scenarios_legi.yaml</code>: left united or split.</li>
+<li><strong>First-round shares in all 577 seats.</strong> Add the five error levels to each seat's ensemble mean.</li>
+<li><strong>Turnout.</strong> Draw each seat's turnout.</li>
+<li><strong>Round-one outcome.</strong> Apply the legal rules. A candidate wins outright with more than 50% of votes cast <em>and</em> at least 25% of registered voters. Anyone with at least 12.5% of registered voters goes through to round two; if fewer than two do, the top two go through.</li>
+<li><strong>Withdrawals.</strong> Third-placed candidates withdraw with probabilities estimated from 2012–2024, moved together by a shared "front républicain" shock.</li>
+<li><strong>Second round.</strong> Compute shares with a bloc-to-bloc transfer matrix, perturbed once per simulation.</li>
+<li><strong>Count seats.</strong></li>
+</ol>
+<p>The outputs are seat distributions, P(≥ 289 seats) and P(largest bloc).</p>
+<h2 id="overview-stage-9-backtesting-no-time-travel">Stage 9 — Backtesting ("no time travel")</h2>
+<p><strong>Code:</strong> <code>forecast/backtest/</code> and <code>forecast/legislative/pipeline.py</code>.</p>
+<p>The backtest replays history in time order. For each past cycle it takes weekly snapshots from 156 days out. Each snapshot uses only:</p>
+<ul>
+<li>polls published by that date;</li>
+<li>models trained on <em>earlier</em> cycles.</li>
+</ul>
+<p>The backtest also produces the archive that the ensemble weights and the error meta-model are trained on. So every error the meta-model learns from is a genuine out-of-sample error.</p>
+<p>Presidential results, 2002–2022 (115 snapshots):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vote-share error, last two weeks</td>
+<td>1.1 points</td>
+</tr>
+<tr>
+<td>Vote-share error, 3–5 months out</td>
+<td>2.6 points</td>
+</tr>
+<tr>
+<td>50% / 90% interval coverage</td>
+<td>44% / 85%</td>
+</tr>
+<tr>
+<td>Brier score, P(win)</td>
+<td>0.034</td>
+</tr>
+<tr>
+<td>Brier score, P(reach runoff)</td>
+<td>0.049</td>
+</tr>
+</tbody>
+</table></div>
+<p>The legislative model has only three test cycles, and its uncertainty ranges are still very wide.</p>
+<h2 id="overview-what-is-judgment-rather-than-data">What is judgment rather than data</h2>
+<p>The model separates estimated quantities from judgment calls, as the post does. The judgment calls live in files you are meant to edit, date and disclose:</p>
+<ul>
+<li><code>data/reference/scenarios_pres_2027.yaml</code>: the lineup probabilities and the January centrist rule;</li>
+<li><code>data/reference/scenarios_legi.yaml</code>: the legislative date, left alliance odds, incumbents' re-run rate and turnout spread;</li>
+<li><code>data/reference/priors.yaml</code>: the weakly informative defaults used when no history exists yet.</li>
+</ul>
+<h2 id="overview-known-limitations">Known limitations</h2>
+<ul>
+<li><strong>Few elections.</strong> Five presidential cycles with polls, and three or four legislative ones. Tails are fat by design, and early backtest cycles rely on the priors.</li>
+<li><strong>Backtests use the actual ballot.</strong> Candidate declaration dates are not curated, so historical lineup uncertainty isn't tested.</li>
+<li><strong>Legislative weak points.</strong> Stale national polls, seat ranges too wide to be decision-useful, and transfer patterns that change from one election to the next (2017 and 2022 both missed RN).</li>
+<li><strong>Transfer models are simpler than planned.</strong> Both are scipy fits rather than the planned Stan transfer model.</li>
+</ul><nav class="pager" aria-label="Previous and next"><a href="#home"><span>Previous</span>Start here</a><a class="next" href="#tutorial"><span>Next</span>Bayesian tutorial</a></nav></section><section class="doc" id="tutorial" aria-label="Bayesian modelling and Stan: a tutorial using this model"><h1 id="tutorial-bayesian-modelling-and-stan-a-tutorial-using-this-model">Bayesian modelling and Stan: a tutorial using this model</h1>
+<p>This tutorial is for readers who know regression, probability distributions and maximum likelihood, but haven't done Bayesian data analysis. Every idea is tied to a place in this project where it is used, so you can open the file and see it at work.</p>
+<p><strong>Contents</strong></p>
+<ol>
+<li><a href="#tutorial-1-bayes-in-one-page">Bayes in one page</a></li>
+<li><a href="#tutorial-2-shrinkage">Shrinkage: the idea behind house effects</a></li>
+<li><a href="#tutorial-3-hierarchical-models-and-partial-pooling">Hierarchical models and partial pooling</a></li>
+<li><a href="#tutorial-4-choosing-the-scale-logs-softmax-and-the-dirichlet">Choosing the scale: logs, softmax and the Dirichlet</a></li>
+<li><a href="#tutorial-5-letting-coefficients-drift-random-walks">Letting coefficients drift: random walks</a></li>
+<li><a href="#tutorial-6-the-fundamentals-model-in-stan-line-by-line">The fundamentals model in Stan, line by line</a></li>
+<li><a href="#tutorial-7-how-stan-fits-a-model-mcmc-and-nuts">How Stan fits a model: MCMC and NUTS</a></li>
+<li><a href="#tutorial-8-the-error-meta-model-variance-components-and-fat-tails">The error meta-model: variance components and fat tails</a></li>
+<li><a href="#tutorial-9-from-posterior-to-forecast-simulation">From posterior to forecast: simulation</a></li>
+<li><a href="#tutorial-10-combining-models-precision-weighting-and-stacking">Combining models: precision weighting and stacking</a></li>
+<li><a href="#tutorial-11-checking-a-probabilistic-forecast">Checking a probabilistic forecast</a></li>
+<li><a href="#tutorial-12-try-it-yourself">Try it yourself</a></li>
+</ol>
+<hr />
+<h2 id="tutorial-1-bayes-in-one-page">1. Bayes in one page</h2>
+<p>In classical (frequentist) statistics a parameter such as "Le Pen's true support" is a fixed unknown, and probability describes the data. In Bayesian statistics the parameter is also uncertain, and probability describes <em>what we know about it</em>. The rule for updating that knowledge is Bayes' theorem:</p>
+<div class="math">\[\underbrace{p(\theta\mid y)}_{\text{posterior}} \;\propto\; \underbrace{p(y\mid\theta)}_{\text{likelihood}}\;\times\;\underbrace{p(\theta)}_{\text{prior}}\]</div>
+<ul>
+<li><strong>Likelihood.</strong> The same object you maximise in maximum-likelihood estimation: how probable the observed data are for each parameter value.</li>
+<li><strong>Prior.</strong> What you believed before seeing these data. It can come from earlier elections, or be deliberately vague.</li>
+<li><strong>Posterior.</strong> The combination. It is a whole <em>distribution</em>, not a point estimate, so uncertainty comes for free.</li>
+</ul>
+<p><strong>A worked example.</strong> Suppose you believe a candidate's support is around 20%, give or take 4 points: prior \(N(20, 4^2)\). A poll of 1,000 people then shows 24%. Its sampling error is about \(\sqrt{0.24\cdot0.76/1000}\approx 1.35\) points, so the likelihood is \(N(24, 1.35^2)\) as a function of true support. When a normal prior meets a normal likelihood, the posterior is normal too. Its mean is a <strong>precision-weighted average</strong>, where precision = 1/variance:</p>
+<div class="math">\[\text{mean}=\frac{20/4^2+24/1.35^2}{1/4^2+1/1.35^2}\approx 23.6,\qquad \text{sd}=\Big(\tfrac{1}{4^2}+\tfrac{1}{1.35^2}\Big)^{-1/2}\approx 1.28\]</div>
+<p>The poll dominates because it is far more precise than the prior. Two ideas from this example run through the whole model:</p>
+<ol>
+<li><strong>Estimates are pulled toward prior information, in proportion to how much data you have.</strong> This is shrinkage.</li>
+<li><strong>Combining sources means weighting each by its precision.</strong> This is how the ensemble works.</li>
+</ol>
+<p>Nearly everything a forecast needs comes from the <strong>posterior predictive distribution</strong>: the distribution of <em>future data</em> (the election result), averaging over parameter uncertainty:</p>
+<div class="math">\[p(\tilde y\mid y)=\int p(\tilde y\mid\theta)\,p(\theta\mid y)\,d\theta\]</div>
+<p>In practice this integral is never computed with symbols. You draw \(\theta\) from the posterior, then simulate \(\tilde y\) from each draw; section 9 shows how.</p>
+<h2 id="tutorial-2-shrinkage">2. Shrinkage</h2>
+<p>Pollster house effects are the cleanest example of Bayesian shrinkage in the model (<code>forecast/polls/house_effects.py</code>).</p>
+<p><strong>The problem.</strong> Ifop's polls ran on average 0.05 below the consensus for one candidate. Is that a real Ifop lean, or noise from a handful of polls? With 3 polls it is probably noise. With 50 it is probably real.</p>
+<p><strong>The model.</strong> Suppose firm \(p\)'s true lean \(\ell_p\) is drawn from \(N(0,\tau^2)\), the spread of leans across firms. Each poll's residual is \(r_i=\ell_p+\varepsilon_i\) with \(\varepsilon_i\sim N(0,\sigma^2)\). With \(n\) polls averaging \(\bar r\), the posterior mean of the lean is</p>
+<div class="math">\[E[\ell_p\mid r]=\frac{n/\sigma^2}{n/\sigma^2+1/\tau^2}\,\bar r=\frac{n}{n+k}\,\bar r,\qquad k=\sigma^2/\tau^2 .\]</div>
+<p>That is the post's rule: keep \(n/(n+5)\) of a firm's measured lean. Here \(k = 5\) says a single poll's noise variance is about five times the variance of true leans across firms. With 5 polls the lean is kept at half strength; with 50 polls, at 91%.</p>
+<p><strong>Race-specific leans.</strong> The post adds back each firm's lean in one particular race at \(n/(n+20)\). The large \(k=20\) encodes a strong prior belief that house effects are mostly a property of the firm, not of the firm–race pair.</p>
+<p><strong>The historical prior.</strong> A firm's leans in past cycles form the prior <em>mean</em> instead of 0. They are blended in with weight \(\alpha = \text{cap}\cdot W/(W+k)\), capped at 10%, so history informs the estimate without overruling the current cycle.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">forecast.polls.house_effects</span><span class="w"> </span><span class="kn">import</span> <span class="n">shrink</span>
+<span class="n">shrink</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">shrink</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">shrink</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>   <span class="c1"># (0.5, 0.909…, 0.0909…)</span>
+</code></pre></div>
+
+<p>This is <strong>empirical Bayes</strong>. The prior's spread (\(k\)) is fixed from outside, and the formula is applied in closed form rather than fitting the full model. Full Bayes would estimate \(\tau\) from the data at the same time. The shrinkage behaviour is the same.</p>
+<h2 id="tutorial-3-hierarchical-models-and-partial-pooling">3. Hierarchical models and partial pooling</h2>
+<p>Shrinkage generalises to <strong>hierarchical</strong> (multilevel) models: parameters for groups are themselves drawn from a distribution whose parameters are estimated.</p>
+<p>There are three ways to estimate 100 département effects on the RN vote:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Model</th>
+<th>Problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No pooling</td>
+<td>Estimate each département separately</td>
+<td>Noisy; small départements get extreme estimates</td>
+</tr>
+<tr>
+<td>Complete pooling</td>
+<td>One shared effect</td>
+<td>Ignores real differences</td>
+</tr>
+<tr>
+<td><strong>Partial pooling</strong></td>
+<td>\(\delta_d\sim N(0,\sigma_{dept}^2)\), with \(\sigma_{dept}\) estimated</td>
+<td>Each estimate borrows strength from the others, by an amount the data choose</td>
+</tr>
+</tbody>
+</table></div>
+<p>The error meta-model (section 8) is hierarchical at four levels: national bloc, region, département and cluster. Each level's \(\sigma\) is estimated from how much errors actually cluster at that level in past elections. If département errors turn out to be pure noise, \(\sigma_{dept}\) is estimated near zero and that level switches itself off.</p>
+<h2 id="tutorial-4-choosing-the-scale-logs-softmax-and-the-dirichlet">4. Choosing the scale: logs, softmax and the Dirichlet</h2>
+<p>Vote shares are <em>compositional</em>: they are positive and sum to 100%. Three tools recur for handling that.</p>
+<ul>
+<li><strong>Log shares plus softmax.</strong> Work with unconstrained numbers \(\eta_j\) (log shares up to a constant) and map them back with \(s_j=e^{\eta_j}/\sum_k e^{\eta_k}\). Adding the same constant to every \(\eta\) changes nothing, so only differences matter. Every error in the model is added on this scale and then softmaxed, so simulated shares are always valid.</li>
+<li><strong>Why logs rather than points?</strong> A 1-point error means something very different for a 30% candidate and a 1% candidate. The backtest showed log-scale errors are closer to homogeneous, and a size term \((s/10\%)^{-\gamma}\) handles what's left.</li>
+<li><strong>The Dirichlet distribution</strong> is a distribution over compositions. \(y\sim\text{Dirichlet}(\phi\,p)\) has mean \(p\), and the concentration \(\phi\) controls the spread: larger \(\phi\) means results scatter less around \(p\). In the fundamentals model, \(\phi\approx 22\) says French first rounds scatter widely around what history alone predicts.</li>
+<li><strong>Lognormal means vs medians.</strong> If \(\log X\sim N(\mu,\sigma^2)\) then \(E[X]=e^{\mu+\sigma^2/2}\), which is larger than the median \(e^\mu\). The simulator subtracts \(\sigma^2/2\) so that noise doesn't inflate small candidates on average. As a result, the reported <em>medians</em> sit a little below the central estimate.</li>
+</ul>
+<h2 id="tutorial-5-letting-coefficients-drift-random-walks">5. Letting coefficients drift: random walks</h2>
+<p>A standard regression assumes a coefficient, for example "incumbency is worth \(\beta\)", is the same in 1995 and in 2022. Lauderdale and Linzer's critique, which the post adopts, is that such fundamentals shift between elections, and pretending otherwise makes forecasts overconfident.</p>
+<p>A <strong>random walk</strong> lets each coefficient drift:</p>
+<div class="math">\[\beta_1\sim N(\mu_0,\sigma_0^2),\qquad \beta_t=\beta_{t-1}+\tau\,z_t,\quad z_t\sim N(0,1).\]</div>
+<ul>
+<li>\(\tau\) is estimated. If the coefficient barely moved in the past, \(\tau\) is estimated small.</li>
+<li>The prediction for the <em>next</em> election uses \(\beta_{T+1}=\beta_T+\tau z\). So a forecast carries both the uncertainty about \(\beta_T\) and the uncertainty about how far it will drift.</li>
+</ul>
+<p>Because every coefficient follows its own state equation like this, the post calls the model a <strong>dynamic linear model</strong>.</p>
+<h2 id="tutorial-6-the-fundamentals-model-in-stan-line-by-line">6. The fundamentals model in Stan, line by line</h2>
+<p>Stan is a language for writing down a probability model. You declare the data, the unknowns and the log density; Stan then draws samples from the posterior. Here is <code>forecast/stan/fundamentals_dlm.stan</code> in full, with comments.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">data</span> <span class="p">{</span>
+  <span class="kt">int</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">1</span><span class="o">&gt;</span> <span class="n">T</span><span class="p">;</span>                 <span class="c1">// number of training elections</span>
+  <span class="kt">int</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">1</span><span class="o">&gt;</span> <span class="n">K</span><span class="p">;</span>                 <span class="c1">// number of predictors</span>
+  <span class="kt">int</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">1</span><span class="o">&gt;</span> <span class="n">R</span><span class="p">;</span>                 <span class="c1">// races (one election&#39;s field, or one seat)</span>
+  <span class="kt">int</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">1</span><span class="o">&gt;</span> <span class="n">N</span><span class="p">;</span>                 <span class="c1">// rows: race × candidate</span>
+  <span class="kt">array</span><span class="p">[</span><span class="n">R</span><span class="p">]</span> <span class="kt">int</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="k">upper</span><span class="p">=</span><span class="n">T</span><span class="o">&gt;</span> <span class="n">race_t</span><span class="p">;</span>   <span class="c1">// which election each race belongs to</span>
+  <span class="kt">array</span><span class="p">[</span><span class="n">R</span><span class="p">]</span> <span class="kt">int</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="k">upper</span><span class="p">=</span><span class="n">N</span><span class="o">&gt;</span> <span class="n">start</span><span class="p">;</span>    <span class="c1">// rows start[r] .. start[r]+len[r]-1</span>
+  <span class="kt">array</span><span class="p">[</span><span class="n">R</span><span class="p">]</span> <span class="kt">int</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">2</span><span class="o">&gt;</span> <span class="n">len</span><span class="p">;</span>
+  <span class="kt">matrix</span><span class="p">[</span><span class="n">N</span><span class="p">,</span> <span class="n">K</span><span class="p">]</span> <span class="n">X</span><span class="p">;</span>                 <span class="c1">// predictors</span>
+  <span class="kt">vector</span><span class="p">[</span><span class="n">N</span><span class="p">]</span> <span class="n">base</span><span class="p">;</span>                 <span class="c1">// fixed offset (used by the legislative version)</span>
+  <span class="kt">vector</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="k">upper</span><span class="p">=</span><span class="mf">1</span><span class="o">&gt;</span><span class="p">[</span><span class="n">N</span><span class="p">]</span> <span class="n">y</span><span class="p">;</span>  <span class="c1">// observed shares, summing to 1 within a race</span>
+  <span class="kt">vector</span><span class="p">[</span><span class="n">K</span><span class="p">]</span> <span class="n">b1_mu</span><span class="p">;</span>                <span class="c1">// prior mean of the first-election coefficients</span>
+  <span class="kt">vector</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">0</span><span class="o">&gt;</span><span class="p">[</span><span class="n">K</span><span class="p">]</span> <span class="n">b1_sd</span><span class="p">;</span>       <span class="c1">// … and their prior sd</span>
+  <span class="kt">vector</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">0</span><span class="o">&gt;</span><span class="p">[</span><span class="n">K</span><span class="p">]</span> <span class="n">tau_scale</span><span class="p">;</span>   <span class="c1">// prior scale of the drift per election</span>
+  <span class="kt">real</span> <span class="n">phi_log_mu</span><span class="p">;</span>                <span class="c1">// prior centre for log(phi)</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The <code>data</code> block declares everything that comes from Python. The constraints (<code>&lt;lower=0&gt;</code>) are checked when the data are passed in.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">parameters</span> <span class="p">{</span>
+  <span class="kt">matrix</span><span class="p">[</span><span class="n">K</span><span class="p">,</span> <span class="n">T</span><span class="p">]</span> <span class="n">z</span><span class="p">;</span>          <span class="c1">// standardised innovations</span>
+  <span class="kt">vector</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">0</span><span class="o">&gt;</span><span class="p">[</span><span class="n">K</span><span class="p">]</span> <span class="n">tau</span><span class="p">;</span>  <span class="c1">// drift sd per predictor</span>
+  <span class="kt">real</span><span class="o">&lt;</span><span class="k">lower</span><span class="p">=</span><span class="mf">0</span><span class="o">&gt;</span> <span class="n">phi</span><span class="p">;</span>       <span class="c1">// Dirichlet concentration</span>
+<span class="p">}</span>
+<span class="kn">transformed parameters</span> <span class="p">{</span>
+  <span class="kt">matrix</span><span class="p">[</span><span class="n">K</span><span class="p">,</span> <span class="n">T</span><span class="p">]</span> <span class="n">beta</span><span class="p">;</span>
+  <span class="n">beta</span><span class="p">[,</span> <span class="mf">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">b1_mu</span> <span class="o">+</span> <span class="n">b1_sd</span> <span class="o">.*</span> <span class="n">z</span><span class="p">[,</span> <span class="mf">1</span><span class="p">];</span>
+  <span class="k">for</span> <span class="p">(</span><span class="n">t</span> <span class="k">in</span> <span class="mf">2</span><span class="o">:</span><span class="n">T</span><span class="p">)</span>
+    <span class="n">beta</span><span class="p">[,</span> <span class="n">t</span><span class="p">]</span> <span class="o">=</span> <span class="n">beta</span><span class="p">[,</span> <span class="n">t</span> <span class="o">-</span> <span class="mf">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">tau</span> <span class="o">.*</span> <span class="n">z</span><span class="p">[,</span> <span class="n">t</span><span class="p">];</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Note that <code>beta</code> isn't sampled directly. Stan samples standard-normal <code>z</code> and <em>builds</em> <code>beta</code> from it. This is the <strong>non-centred parameterisation</strong>. When <code>tau</code> is small the posterior of <code>beta</code> becomes a narrow, curved "funnel" that samplers struggle with; <code>z</code> stays well behaved, and sampling becomes reliable. It is the most common trick in hierarchical Stan models.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">model</span> <span class="p">{</span>
+  <span class="nb">to_vector</span><span class="p">(</span><span class="n">z</span><span class="p">)</span> <span class="o">~</span><span class="w"> </span><span class="nb">std_normal</span><span class="p">();</span>          <span class="c1">// priors</span>
+  <span class="n">tau</span> <span class="o">~</span><span class="w"> </span><span class="nb">normal</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span> <span class="n">tau_scale</span><span class="p">);</span>           <span class="c1">// half-normal, since tau &gt; 0</span>
+  <span class="n">phi</span> <span class="o">~</span><span class="w"> </span><span class="nb">lognormal</span><span class="p">(</span><span class="n">phi_log_mu</span><span class="p">,</span> <span class="mf">1</span><span class="p">);</span>
+  <span class="k">for</span> <span class="p">(</span><span class="n">r</span> <span class="k">in</span> <span class="mf">1</span><span class="o">:</span><span class="n">R</span><span class="p">)</span> <span class="p">{</span>                      <span class="c1">// likelihood, race by race</span>
+    <span class="kt">int</span> <span class="n">s</span> <span class="o">=</span> <span class="n">start</span><span class="p">[</span><span class="n">r</span><span class="p">];</span>
+    <span class="kt">int</span> <span class="n">e</span> <span class="o">=</span> <span class="n">s</span> <span class="o">+</span> <span class="n">len</span><span class="p">[</span><span class="n">r</span><span class="p">]</span> <span class="o">-</span> <span class="mf">1</span><span class="p">;</span>
+    <span class="kt">vector</span><span class="p">[</span><span class="n">len</span><span class="p">[</span><span class="n">r</span><span class="p">]]</span> <span class="n">eta</span> <span class="o">=</span> <span class="n">base</span><span class="p">[</span><span class="n">s</span><span class="o">:</span><span class="n">e</span><span class="p">]</span> <span class="o">+</span> <span class="n">X</span><span class="p">[</span><span class="n">s</span><span class="o">:</span><span class="n">e</span><span class="p">]</span> <span class="o">*</span> <span class="nb">col</span><span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="n">race_t</span><span class="p">[</span><span class="n">r</span><span class="p">]);</span>
+    <span class="k">target +=</span> <span class="nb">dirichlet_lpdf</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="n">s</span><span class="o">:</span><span class="n">e</span><span class="p">]</span> <span class="p">|</span> <span class="nb">softmax</span><span class="p">(</span><span class="n">eta</span><span class="p">)</span> <span class="o">*</span> <span class="n">phi</span><span class="p">);</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>~</code> adds a log density to the running total, and <code>target +=</code> does the same thing explicitly. The whole <code>model</code> block is just \(\log p(\text{prior}) + \log p(\text{data}\mid\text{parameters})\).</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">generated quantities</span> <span class="p">{</span>
+  <span class="kt">vector</span><span class="p">[</span><span class="n">K</span><span class="p">]</span> <span class="n">beta_next</span><span class="p">;</span>
+  <span class="k">for</span> <span class="p">(</span><span class="n">k</span> <span class="k">in</span> <span class="mf">1</span><span class="o">:</span><span class="n">K</span><span class="p">)</span>
+    <span class="n">beta_next</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">beta</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">T</span><span class="p">]</span> <span class="o">+</span> <span class="n">tau</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">*</span> <span class="nb">normal_rng</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span> <span class="mf">1</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><code>generated quantities</code> runs once per posterior draw, so <code>beta_next</code> is a draw from the predictive distribution of next election's coefficients. Python (<code>forecast/fundamentals/dlm.py</code>) then turns each draw into shares for any lineup, and adds Dirichlet noise. The result is the full posterior predictive: coefficient uncertainty, plus drift, plus election-level noise.</p>
+<p>The priors live in <code>data/reference/priors.yaml</code>. For example, <code>log_baseline: [1.0, 0.5, 0.3]</code> means the first-election coefficient is \(N(1, 0.5^2)\), with drift scale 0.3. They are <em>weakly informative</em>: they rule out absurd values (a baseline coefficient of −20) without dictating the answer.</p>
+<h2 id="tutorial-7-how-stan-fits-a-model-mcmc-and-nuts">7. How Stan fits a model: MCMC and NUTS</h2>
+<p>For all but the simplest models the posterior has no closed form, and it lives in many dimensions: this model has \(K\cdot T+K+1\) parameters. <strong>Markov chain Monte Carlo</strong> (MCMC) sidesteps the problem. It builds a random walk through parameter space whose long-run visiting frequencies equal the posterior. You never get the formula, but you get thousands of draws from it, and any quantity you want is an average over the draws.</p>
+<p>Stan's sampler is <strong>NUTS</strong>, the No-U-Turn Sampler, a form of <strong>Hamiltonian Monte Carlo</strong>. The intuition: treat \(-\log p(\theta\mid y)\) as a landscape and roll a frictionless ball over it, using the gradient (which Stan computes automatically) to make long, informed moves instead of blind random steps. NUTS picks how long to roll each time.</p>
+<p>A run has these parts:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+<th>This project</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chains</td>
+<td>Independent runs from different starting points</td>
+<td>4</td>
+</tr>
+<tr>
+<td>Warm-up</td>
+<td>Early iterations used to tune step size; discarded</td>
+<td>1,000 (400–800 for big models)</td>
+</tr>
+<tr>
+<td>Draws</td>
+<td>Kept iterations per chain</td>
+<td>1,000</td>
+</tr>
+<tr>
+<td><code>adapt_delta</code></td>
+<td>Target acceptance rate; higher means smaller, safer steps</td>
+<td>0.9–0.95</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Diagnostics you should look at:</strong></p>
+<ul>
+<li><strong>R-hat</strong> compares variation within and between chains. Values ≈ 1.00 mean the chains agree; above 1.01 means they haven't converged.</li>
+<li><strong>Effective sample size (ESS).</strong> Draws are correlated; ESS is how many independent draws they are worth. Aim for several hundred.</li>
+<li><strong>Divergences.</strong> The sampler met curvature it couldn't follow, usually a funnel. Even a few are a warning: reparameterise, or raise <code>adapt_delta</code>.</li>
+</ul>
+<p>The warnings you may see in the logs during warm-up, such as <code>Scale parameter is 0</code> or <code>dirichlet_lpdf: … nan</code>, happen when the sampler tries an extreme value early on. They are harmless unless they persist into the kept draws.</p>
+<p><strong>Running a model by hand:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">forecast.stan.build</span><span class="w"> </span><span class="kn">import</span> <span class="n">compile_model</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">compile_model</span><span class="p">(</span><span class="s2">&quot;fundamentals_dlm&quot;</span><span class="p">)</span>      <span class="c1"># compiles once into forecast/stan/build/</span>
+<span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>                                   <span class="c1"># see tests/forecast/test_stan_models.py for a synthetic example</span>
+<span class="n">fit</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">iter_warmup</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">iter_sampling</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fit</span><span class="o">.</span><span class="n">diagnose</span><span class="p">())</span>                          <span class="c1"># R-hat, ESS, divergences</span>
+<span class="n">beta</span> <span class="o">=</span> <span class="n">fit</span><span class="o">.</span><span class="n">stan_variable</span><span class="p">(</span><span class="s2">&quot;beta&quot;</span><span class="p">)</span>               <span class="c1"># numpy array: (draws, K, T)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">beta</span><span class="p">[:,</span> <span class="p">:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">beta</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">95</span><span class="p">]))</span>
+</code></pre></div>
+
+<p>In the pipeline, <code>forecast/stan/build.py::cached_sample</code> wraps this and caches the draws by a hash of (code, data, settings), so the backtest doesn't refit identical models.</p>
+<p><strong>Why not maximum likelihood?</strong> For the hierarchical error model, the maximum of the likelihood often sets a variance component to exactly zero. That says "this level never matters", which is overconfident. MCMC averages over plausible values instead.</p>
+<h2 id="tutorial-8-the-error-meta-model-variance-components-and-fat-tails">8. The error meta-model: variance components and fat tails</h2>
+<p><code>forecast/stan/error_meta.stan</code> asks: <em>how wrong has this forecasting system been, and in what pattern?</em> Its data are the system's own out-of-sample errors from the backtest.</p>
+<div class="math">\[\text{err}_n=\sum_{\ell}u_{\ell,g(n)}+v_n,\qquad u_{\ell,g}\sim t_\nu\!\big(0,\;a_\ell+b_\ell\sqrt{\text{days}_g}\big),\qquad v_n\sim t_\nu\!\big(0,\;\bar\sigma_n\,m_0(1+m_1\,\text{scarcity}_n+m_2\,\text{disagree}_n)\big)\]</div>
+<ul>
+<li>\(u_{\ell,g}\) is a <strong>shared shock</strong>, common to every row in group \(g\) at level \(\ell\). At the bloc level, for example, one number is shared by all right-wing candidates in one snapshot. The model estimates how big these shocks typically are (\(a_\ell\)), and how fast that size grows with days to the election (\(b_\ell\)).</li>
+<li>\(v_n\) is the <strong>individual error</strong>. Its size is the ensemble's own stated uncertainty \(\bar\sigma_n\) times a correction. The correction checks whether the ensemble is honest: if \(m_0\) is below 1, the ensemble was too cautious.</li>
+<li>This is a <strong>variance-components</strong> model, the hierarchical idea from section 3 applied to errors.</li>
+</ul>
+<p><strong>Why a Student-t with ν = number of training cycles?</strong> Thousands of error rows come from only five elections, and errors within one election are correlated. A normal distribution would treat those rows as thousands of independent pieces of evidence that big misses are rare. A \(t\) distribution with 5 degrees of freedom has fat tails, so a 2002-style surprise stays plausible. That is the post's "we have only watched about ten elections actually happen".</p>
+<p><strong>A trap, and a bug we fixed.</strong> Stan's <code>student_t(nu, mu, sigma)</code> takes a <strong>scale</strong> \(\sigma\), not a standard deviation; the sd is \(\sigma\sqrt{\nu/(\nu-2)}\).</p>
+<ul>
+<li>The first simulator rescaled every t draw to unit variance. With ν = 3 that shrank the scale by 42%.</li>
+<li>The backtest's 50% intervals covered only 36% of results.</li>
+<li>After the fix, <code>antithetic_t(..., unit_variance=False)</code> whenever the sd came from the meta-model, coverage went to 44% (50% intervals) and 85% (90% intervals).</li>
+</ul>
+<p>When you mix distributions, always check what each "sigma" means.</p>
+<h2 id="tutorial-9-from-posterior-to-forecast-simulation">9. From posterior to forecast: simulation</h2>
+<p>Once you have a posterior (or a set of error scales), a forecast is a <strong>Monte Carlo simulation</strong>. You draw every uncertain quantity and apply the election rules deterministically. Each draw is one possible election, and any probability is a frequency:</p>
+<div class="math">\[P(\text{Le Pen wins})\approx\frac{\#\{\text{simulations Le Pen wins}\}}{40{,}000}\]</div>
+<p>The Monte Carlo error is \(\sqrt{p(1-p)/N}\). For \(p = 0.5\) and \(N = 40{,}000\) that is ±0.25 points, which is why reruns can differ in the first decimal.</p>
+<p>Details from <code>forecast/simulate/presidential.py</code> worth understanding:</p>
+<ul>
+<li><strong>Structure beats formulas.</strong> Nobody could write P(Philippe reaches the runoff <em>and</em> beats Le Pen) in closed form. Simulating the steps in order (lineup → January decision → first round → top two → runoff) gets it for free, with all the correlations built in.</li>
+<li><strong>Antithetic draws.</strong> Shocks come in ± pairs, so they average to exactly zero and never shift the central estimate (a requirement in the post). This also reduces Monte Carlo noise.</li>
+<li><strong>Two-stage shocks for decisions.</strong> For the January centrist rule, each candidate's error is split into the part realised by 15 January (fraction \(f\) of the variance) and the part realised afterwards. The rule reads the January polls, \(\mu + e_1\). The first round uses \(\mu+e_1+e_2\). The candidates who stay keep their January draw, so the decision and the outcome are consistently correlated.</li>
+<li><strong>Scenario mixtures.</strong> The lineup is itself random, with probabilities set in the YAML. Pooled results such as "P(RN wins)" average over lineups, exactly like averaging over parameter uncertainty in section 1.</li>
+</ul>
+<h2 id="tutorial-10-combining-models-precision-weighting-and-stacking">10. Combining models: precision weighting and stacking</h2>
+<p>You have two forecasts of the same quantity, from polls and from fundamentals, each with an error sd. Section 1 says to combine them by precision:</p>
+<div class="math">\[\hat\mu=\frac{\mu_p/\sigma_p^2+\mu_f/\sigma_f^2}{1/\sigma_p^2+1/\sigma_f^2}.\]</div>
+<p>This is optimal <em>if the errors are independent and the stated sds are right</em>. Both assumptions can fail. So:</p>
+<ol>
+<li><strong>Measure the sds out of sample.</strong> <code>PrecisionModel.fit</code> fits each component's actual error scale on the backtest archive, rather than trusting what the component claims.</li>
+<li><strong>Stack.</strong> Try multipliers on the fundamentals' precision (\(\kappa\in\{0, 0.1, 0.25, 0.5, 1, 2\}\)) and keep the one that minimised error on <em>earlier</em> cycles.</li>
+</ol>
+<p>This is a simple version of Bayesian stacking (Yao et al., 2018), which the post cites. Stacking optimises out-of-sample predictive performance directly, instead of assuming a model is true.</p>
+<p>The data chose \(\kappa\) = 0.25–0.5: French presidential fundamentals are weak, so they get a small voice.</p>
+<h2 id="tutorial-11-checking-a-probabilistic-forecast">11. Checking a probabilistic forecast</h2>
+<p>A single election can't prove a probability wrong: a 30% event happening isn't a failure. You judge a forecaster over many forecasts. <code>forecast/backtest/metrics.py</code> implements four checks.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Question</th>
+<th>Ideal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Calibration</strong></td>
+<td>Of all the times we said 70–85%, how often did it happen?</td>
+<td>Close to the stated probability. Wilson intervals show how much is noise.</td>
+</tr>
+<tr>
+<td><strong>Interval coverage</strong></td>
+<td>Did the actual share fall inside the 50% (90%) interval about 50% (90%) of the time?</td>
+<td>50% / 90%. Lower means overconfident.</td>
+</tr>
+<tr>
+<td><strong>Brier score</strong></td>
+<td>Mean of \((p-y)^2\) over forecasts, \(y \in \{0,1\}\)</td>
+<td>Lower is better; always saying 50% scores 0.25.</td>
+</tr>
+<tr>
+<td><strong>Log loss</strong></td>
+<td>\(-\overline{y\log p+(1-y)\log(1-p)}\)</td>
+<td>Lower is better; punishes confident misses hard.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Time travel</strong> is the cardinal sin. A backtest that fits its parameters on the elections it is then scored on looks brilliant and means nothing. <code>forecast/backtest/harness.py</code> runs one chronological pass. The 2017 snapshots use only models trained on 2002–2012, and polls published by that snapshot's date. The one disclosed leak is that historical lineups are the actual ballots.</p>
+<p>This backtest is also what the ensemble weights and the error meta-model learn from, so its honesty matters twice.</p>
+<h2 id="tutorial-12-try-it-yourself">12. Try it yourself</h2>
+<ol>
+<li><strong>Shrinkage.</strong> In a notebook, run <code>polling_average</code> on <code>tests/forecast/synthetic.py</code>'s <code>make_polls()</code>. Then read <code>result.house_table</code>: P1 should lean about +0.10 on candidate B and P2 about −0.10. Halve the number of polls and see how much the estimates shrink.</li>
+<li><strong>Priors matter less with more data.</strong> In <code>tests/forecast/test_stan_models.py</code>, change <code>b1_mu</code> to <code>[3.0, 3.0]</code> and rerun with <code>pytest -m slow</code>. With 120 races the posterior barely moves. Now cut the data to 10 races.</li>
+<li><strong>Random-walk drift.</strong> Fit <code>fit_fundamentals</code> on 1995–2012 and on 1995–2022, then compare <code>beta_next.std(axis=0)</code>. The predictive sd includes drift, so it doesn't shrink to zero with more data.</li>
+<li><strong>Fat tails.</strong> Compare <code>np.quantile(antithetic_t(rng, (100000,), 3), [0.05, 0.95])</code> with a normal distribution's quantiles. Then see how P(Le Pen wins) changes when you set <code>errors.nu_floor: 30</code> in <code>config/model.yaml</code>.</li>
+<li><strong>Judgment inputs.</strong> Change the centrist <code>threshold</code> in <code>scenarios_pres_2027.yaml</code> from 15 to 12, rerun <code>python -m forecast run</code>, and watch the "Philippe alone" share rise.</li>
+</ol>
+<p><strong>Further reading:</strong></p>
+<ul>
+<li>McElreath, <em>Statistical Rethinking</em>: the gentlest full introduction.</li>
+<li>Gelman et al., <em>Bayesian Data Analysis</em>: the reference.</li>
+<li>The Stan User's Guide: the chapters on hierarchical models and reparameterisation.</li>
+<li>Gelman, Hullman, Wlezien &amp; Morris (2020), "Information, incentives, and goals in election forecasts", and the FiftyPlusOne methodology post saved in <code>fifty_plus_one/</code>.</li>
+</ul><nav class="pager" aria-label="Previous and next"><a href="#overview"><span>Previous</span>Model overview</a><a class="next" href="#files"><span>Next</span>File guide</a></nav></section><section class="doc" id="files" aria-label="File guide"><h1 id="files-file-guide">File guide</h1>
+<p>Where everything lives, what each file does, and which files you are expected to edit. Paths are relative to the repository root.</p>
+<h2 id="files-top-level">Top level</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Path</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PLAN.md</code></td>
+<td>Design document: how the post maps to France, the parameters, deliberate departures, and implementation status.</td>
+</tr>
+<tr>
+<td><code>README.md</code></td>
+<td>Project introduction and run commands.</td>
+</tr>
+<tr>
+<td><code>pyproject.toml</code></td>
+<td>Dependencies (<code>[stan]</code> adds cmdstanpy), pytest settings and markers (<code>slow</code>, <code>network</code>).</td>
+</tr>
+<tr>
+<td><code>config/model.yaml</code></td>
+<td><strong>Every model parameter, each with its source</strong> (<code>post</code>, <code>law</code>, <code>assumption</code> or <code>estimated</code>). Edit here, not in code.</td>
+</tr>
+<tr>
+<td><code>polls_helpers.py</code>, <code>french_elections_polls.ipynb</code></td>
+<td>The original polling-analysis tools (kernel smoother, charts). The forecast reuses their parsers.</td>
+</tr>
+<tr>
+<td><code>forecast_2027.ipynb</code></td>
+<td>Configuration-only notebook: runs both forecasts and shows the backtest charts.</td>
+</tr>
+<tr>
+<td><code>wiki_cache/</code></td>
+<td>Gzipped HTML of the pinned Wikipedia revisions, committed so the pipeline runs offline and reproducibly.</td>
+</tr>
+<tr>
+<td><code>docs/</code></td>
+<td>This documentation.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="files-inputs-you-edit-datareference">Inputs you edit — <code>data/reference/</code></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+<th>When to edit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scenarios_pres_2027.yaml</code></td>
+<td>Lineup mixture: slot probabilities (e.g. Le Pen 0.95 / Bardella 0.05), fixed and optional candidates, and the January centrist decision rule.</td>
+<td>Whenever the field changes; date and disclose these judgment calls.</td>
+</tr>
+<tr>
+<td><code>scenarios_legi.yaml</code></td>
+<td>Assumed legislative date, united vs split left, LFI's share of a split left, incumbents' re-run rate, turnout spread.</td>
+<td>Before running <code>forecast legi</code>.</td>
+</tr>
+<tr>
+<td><code>candidates_pres.csv</code></td>
+<td>One row per candidate per election (1981–2027): party, bloc, incumbency, experience, results.</td>
+<td>When a new name appears in the polls (the ingest report lists unmatched headers).</td>
+</tr>
+<tr>
+<td><code>pages.yaml</code></td>
+<td>Wikipedia pages, pinned revisions, and the rules that decide which tables to read.</td>
+<td>To pick up new polls: bump the revision, then <code>forecast ingest</code>.</td>
+</tr>
+<tr>
+<td><code>pollster_aliases.csv</code>, <code>pollster_meta.csv</code></td>
+<td>Raw pollster name → firm; survey mode by year; publication lag.</td>
+<td>When a new pollster appears.</td>
+</tr>
+<tr>
+<td><code>party_bloc_map.csv</code></td>
+<td>Ministry party labels ("nuances") → model units, per legislative election.</td>
+<td>For a new legislative election.</td>
+</tr>
+<tr>
+<td><code>departement_region.csv</code></td>
+<td>Département → region, for the regional error level.</td>
+<td>Rarely.</td>
+</tr>
+<tr>
+<td><code>priors.yaml</code></td>
+<td>Weakly informative priors used when no history exists: fundamentals coefficients, prior error scales.</td>
+<td>Only with a stated reason.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="files-generated-data-gitignored">Generated data (gitignored)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data/raw/</code></td>
+<td>Downloaded parquet/CSV results, plus <code>manifest.json</code> (URL, sha256, date).</td>
+</tr>
+<tr>
+<td><code>data/processed/</code></td>
+<td><code>polls_long.parquet</code> (one row per poll row × candidate), <code>lineups.parquet</code>, <code>events.parquet</code>, cached horizon models.</td>
+</tr>
+<tr>
+<td><code>data/cache/fits/</code></td>
+<td>Cached Stan posterior draws, keyed by a hash of model code + data + settings.</td>
+</tr>
+<tr>
+<td><code>data/archive/</code></td>
+<td>Backtest archives: <code>pres_backtest*.parquet</code>, <code>legi_backtest*.parquet</code>. The ensemble and meta-model are trained on these.</td>
+</tr>
+<tr>
+<td><code>data/outputs/</code></td>
+<td>Forecast tables, reports and charts.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="files-the-forecast-package">The <code>forecast</code> package</h2>
+<h3 id="files-entry-points">Entry points</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>forecast/__main__.py</code></td>
+<td>Command line: <code>ingest</code>, <code>average</code>, <code>run</code>, <code>backtest</code>, <code>legi</code>, <code>legi-backtest</code>.</td>
+</tr>
+<tr>
+<td><code>forecast/config.py</code></td>
+<td>Loads <code>config/model.yaml</code> into frozen dataclasses and keeps each parameter's provenance.</td>
+</tr>
+<tr>
+<td><code>forecast/paths.py</code></td>
+<td>Where every directory lives.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="files-ingest-getting-data-in"><code>ingest/</code> — getting data in</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pages.py</code></td>
+<td>Loads <code>pages.yaml</code>, downloads and caches pinned revisions, and selects tables by rule.</td>
+</tr>
+<tr>
+<td><code>registry.py</code></td>
+<td>Matches candidate column headers, scored so "Philippe Poutou" doesn't match Édouard Philippe; canonicalises pollster names.</td>
+</tr>
+<tr>
+<td><code>wiki_long.py</code></td>
+<td>Parses a table into the long poll format; drops results and event rows; applies the multi-way-ballot rule; computes rolling-tracker overlap weights.</td>
+</tr>
+<tr>
+<td><code>legi_polls.py</code></td>
+<td>National legislative polls: maps party columns to units and undoes Wikipedia's merged cells.</td>
+</tr>
+<tr>
+<td><code>harmonised.py</code></td>
+<td>data.gouv.fr polling-station results → votes per constituency (2012–2022).</td>
+</tr>
+<tr>
+<td><code>ministry.py</code></td>
+<td>Ministry per-constituency files for 2024.</td>
+</tr>
+<tr>
+<td><code>build.py</code></td>
+<td>Writes and loads <code>data/processed/polls_long.parquet</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="files-polls-the-polls-model"><code>polls/</code> — the polls model</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>weights.py</code></td>
+<td>Recency decay, sample-size and partisan weights, and the anchoring slack \(s(n)\).</td>
+</tr>
+<tr>
+<td><code>trend.py</code></td>
+<td>Cross-lineup candidate trend (kernel smoother with lineup effects).</td>
+</tr>
+<tr>
+<td><code>house_effects.py</code></td>
+<td>Shrunk house, mode and population effects; historical prior store.</td>
+</tr>
+<tr>
+<td><code>ewma.py</code></td>
+<td>The three-pass average. <code>polling_average()</code> is the function to call.</td>
+</tr>
+<tr>
+<td><code>lineups.py</code></td>
+<td>Nested-logit substitution model, anchoring, and imputation error for unpolled lineups.</td>
+</tr>
+<tr>
+<td><code>horizon.py</code></td>
+<td>\(\sigma(h, s)\): how far an average can still move, fitted on past cycles.</td>
+</tr>
+<tr>
+<td><code>drift.py</code></td>
+<td>Late-consolidation drift. Implemented, tested, and <strong>disabled</strong> (it hurt out of sample).</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="files-fundamentals-history-only-second-opinion"><code>fundamentals/</code> — history-only second opinion</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>features_pres.py</code></td>
+<td>Builds the four predictors for any lineup.</td>
+</tr>
+<tr>
+<td><code>dlm.py</code></td>
+<td>Fits <code>fundamentals_dlm.stan</code> and turns draws into predictive means and sds.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="files-stan-bayesian-models"><code>stan/</code> — Bayesian models</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fundamentals_dlm.stan</code></td>
+<td>Softmax regression with random-walk coefficients and a Dirichlet likelihood. Also used for the legislative fundamentals, with seats as races.</td>
+</tr>
+<tr>
+<td><code>error_meta.stan</code></td>
+<td>Error meta-model: shared shocks plus an individual error, Student-t.</td>
+</tr>
+<tr>
+<td><code>build.py</code></td>
+<td>Compiles models once and caches fits by hash. Reads draws with <code>stan_variable()</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="files-ensemble-errors-simulate"><code>ensemble/</code>, <code>errors/</code>, <code>simulate/</code></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ensemble/stacking.py</code></td>
+<td>Out-of-sample precision weights and the stacking multiplier; <code>combine()</code>.</td>
+</tr>
+<tr>
+<td><code>errors/meta_model.py</code></td>
+<td>Prepares archive rows for <code>error_meta.stan</code>; <code>ErrorModel</code> gives shock sds by horizon.</td>
+</tr>
+<tr>
+<td><code>simulate/scenarios.py</code></td>
+<td>Parses the scenario YAML; enumerates lineups and decision variants.</td>
+</tr>
+<tr>
+<td><code>simulate/runoff.py</code></td>
+<td>Presidential runoff: matchup averages, transfer model, anchoring.</td>
+</tr>
+<tr>
+<td><code>simulate/presidential.py</code></td>
+<td>The 40,000-draw presidential simulator: two-stage shocks, the January decision, first round, runoff.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="files-presidential-and-legislative"><code>presidential/</code> and <code>legislative/</code></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>presidential/pipeline.py</code></td>
+<td><code>run_forecast()</code>: everything from the poll table to the summary tables; <code>write_averages()</code>.</td>
+</tr>
+<tr>
+<td><code>legislative/data.py</code></td>
+<td>Seat results, winners, presidential results by seat, lean, lagged results, incumbents.</td>
+</tr>
+<tr>
+<td><code>legislative/features.py</code></td>
+<td>Seat × unit design table.</td>
+</tr>
+<tr>
+<td><code>legislative/nowcast.py</code></td>
+<td>Seat now-cast from the national polling average.</td>
+</tr>
+<tr>
+<td><code>legislative/rounds.py</code></td>
+<td>Two-round law, withdrawal model, transfer matrix.</td>
+</tr>
+<tr>
+<td><code>legislative/clusters.py</code></td>
+<td>k-means clusters of seats by voting pattern.</td>
+</tr>
+<tr>
+<td><code>legislative/pipeline.py</code></td>
+<td>Components, ensemble, chunked simulation, backtest, <code>run_legislative_forecast()</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="files-backtest-and-report"><code>backtest/</code> and <code>report/</code></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>backtest/harness.py</code></td>
+<td>Chronological, strictly out-of-sample presidential backtest; writes the archive.</td>
+</tr>
+<tr>
+<td><code>backtest/metrics.py</code></td>
+<td>Error by horizon, interval coverage, calibration buckets, Brier score, log loss.</td>
+</tr>
+<tr>
+<td><code>backtest/charts.py</code>, <code>backtest/report.py</code></td>
+<td>Backtest charts and text report (<code>data/outputs/backtest_pres/</code>).</td>
+</tr>
+<tr>
+<td><code>report/charts.py</code></td>
+<td>Forecast charts used by the notebook.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="files-tests-testsforecast">Tests — <code>tests/forecast/</code></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_config_weights.py</code></td>
+<td>Config provenance; decay, shrinkage and slack formulas; the historical prior.</td>
+</tr>
+<tr>
+<td><code>test_ingest.py</code></td>
+<td>Header matching, pollster aliases, a synthetic 2027 page, and a regression against the committed CSVs.</td>
+</tr>
+<tr>
+<td><code>test_ewma.py</code></td>
+<td>The three-pass average recovers known truth and house effects on a synthetic election.</td>
+</tr>
+<tr>
+<td><code>test_nowcast_simulation.py</code></td>
+<td>Scenarios, nested logit, runoff, simulation invariants, the centrist decision rule.</td>
+</tr>
+<tr>
+<td><code>test_legislative.py</code></td>
+<td>Two-round law, withdrawals, transfers, poll parsing, now-cast recovery, seat totals.</td>
+</tr>
+<tr>
+<td><code>test_stan_models.py</code></td>
+<td><code>slow</code>: both Stan models recover known parameters from simulated data.</td>
+</tr>
+<tr>
+<td><code>synthetic.py</code></td>
+<td>Generates the synthetic elections used above.</td>
+</tr>
+</tbody>
+</table></div><nav class="pager" aria-label="Previous and next"><a href="#tutorial"><span>Previous</span>Bayesian tutorial</a></nav></section></main>
+</div>
+<script>window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+  svg: { fontCache: 'global' } };</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" defer></script>
+<script>
+(function () {
+  const docs = [...document.querySelectorAll('section.doc')];
+  const links = [...document.querySelectorAll('nav.side > ol > li > a')];
+  const tocs = [...document.querySelectorAll('nav.side .toc')];
+  function show(hash) {
+    const id = (hash || '').replace(/^#/, '');
+    let doc = docs.find(d => d.id === id) || docs.find(d => id && d.querySelector('[id="' + id + '"]')) || docs[0];
+    docs.forEach(d => { d.hidden = d !== doc; });
+    links.forEach(a => a.classList.toggle('current', a.getAttribute('href') === '#' + doc.id));
+    tocs.forEach(t => { t.hidden = t.dataset.doc !== doc.id; });
+    const target = id && id !== doc.id ? document.getElementById(id) : null;
+    if (target) target.scrollIntoView(); else window.scrollTo(0, 0);
+    try { localStorage.setItem('docs-last', doc.id); } catch (e) {}
+  }
+  window.addEventListener('hashchange', () => show(location.hash));
+  let start = location.hash;
+  if (!start) { try { start = '#' + (localStorage.getItem('docs-last') || ''); } catch (e) {} }
+  show(start);
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'neutral' });</script>
+</body></html>

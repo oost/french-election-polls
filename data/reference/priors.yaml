@@ -1,0 +1,41 @@
+# Fixed, weakly informative priors shared across backtest test years (the
+# post's disclosed exception: "a fixed table of weakly informative priors is
+# shared across test years"). None of these values uses outcome data.
+
+fundamentals_pres:
+  # predictor: [initial mean, initial sd, random-walk step sd scale]
+  log_baseline:  [1.0, 0.5, 0.3]   # bloc strength maps roughly one-to-one onto candidate strength
+  incumbency:    [0.0, 1.0, 0.3]
+  experience:    [0.0, 1.0, 0.3]   # scaled 0–1 (grade / 3)
+  personal_vote: [0.5, 0.5, 0.3]   # past over-performance partly persists
+  phi_log_mu: 5.0                  # Dirichlet concentration ≈ e^5 ≈ 150
+
+fundamentals_legi:
+  log_baseline:  [1.0, 0.5, 0.3]
+  lagged:        [0.5, 0.5, 0.3]
+  incumbency:    [0.2, 0.5, 0.2]
+  experience:    [0.1, 0.5, 0.2]
+  personal_vote: [0.5, 0.5, 0.3]
+  phi_log_mu: 4.0
+
+# Polls-component error curve before any earlier cycle exists (2002 backtest):
+# sd(h, share) = (a + b·√h)·(share/10%)^(−gamma), log-share scale. Round
+# weakly informative values, not fitted.
+horizon_pres:
+  a: 0.15
+  b: 0.03
+  gamma: 0.25
+
+# Legislative error levels before any out-of-sample archive exists:
+# [a, b] with shock sd = a + b·√days (log-share scale). Weakly informative.
+errors_legi:
+  national: [0.08, 0.01]
+  region:   [0.05, 0.0]
+  dept:     [0.05, 0.0]
+  cluster:  [0.05, 0.0]
+
+# Error of the national legislative polling average vs the national result,
+# sd = a + b·√days (log-share scale), used for the polls component's stated sd.
+national_legi:
+  a: 0.08
+  b: 0.015

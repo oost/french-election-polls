@@ -1,0 +1,56 @@
+# 2027 lineup mixture — the counterpart of the post's "primaries that haven't
+# happened yet": each simulation draws one lineup, then simulates both rounds.
+#
+# THE PROBABILITIES BELOW ARE ILLUSTRATIVE DEFAULTS, NOT ESTIMATES. They are
+# judgment calls (like the post's Montana independent scenario) and should be
+# set, dated and disclosed by whoever publishes a forecast.
+#
+# Timeline they were written against (event rows of the pinned Wikipedia
+# revision, 2026-09-28): Le Pen cleared to run on appeal and declared
+# (7 Jul 2026); Attal (22 May), Glucksmann (23 Aug), Faure (30 Aug), Roussel
+# (6 Sep), Zemmour (17 Sep) and Dupont-Aignan (19 Sep) declared; Philippe,
+# Retailleau, Mélenchon and Tondelier took part in the 27 Aug debate; the
+# Socialist primary has five candidates (Faure, Glucksmann, Guedj, Maurel,
+# Royal). Guedj and Maurel appear in no poll, so they cannot be forecast and
+# are left out of the primary slot.
+
+election: {id: 2027_pres, t1: 2027-04-18, t2: 2027-05-02}
+as_of: 2026-09-28
+
+slots:                        # exactly one option per slot; null = nobody from this slot runs
+  rn:
+    LE_PEN_MARINE: 0.95
+    BARDELLA_JORDAN: 0.05
+  socialist_primary:
+    GLUCKSMANN_RAPHAEL: 0.5
+    FAURE_OLIVIER: 0.4
+    ROYAL_SEGOLENE: 0.1
+
+fixed:                        # run in every simulation
+  - ARTHAUD_NATHALIE
+  - ROUSSEL_FABIEN
+  - MELENCHON_JEAN_LUC
+  - TONDELIER_MARINE
+  - RETAILLEAU_BRUNO
+  - DUPONT_AIGNAN_NICOLAS
+  - ZEMMOUR_ERIC
+
+optional:                     # independent yes/no draws
+  POUTOU_PHILIPPE: 0.6
+  VILLEPIN_DOMINIQUE_DE: 0.3
+
+constraints: []               # e.g. {if: {rn: BARDELLA_JORDAN}, exclude: [ZEMMOUR_ERIC]}
+
+# Decisions taken later in the campaign from the polls at the time. Each
+# simulation draws the polling average on `date` (the part of the forecast
+# error realised by then), applies the rule, then simulates the rest of the
+# campaign from there. Pool members start in every lineup.
+decisions:
+  centrist:
+    date: 2027-01-15
+    pool: [PHILIPPE_EDOUARD, ATTAL_GABRIEL]
+    # the leading centrist runs alone if polling above 15%; otherwise the top
+    # two, plus anyone above 10%, run
+    threshold: 15
+    fallback_top: 2
+    fallback_above: 10

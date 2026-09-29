@@ -18,3 +18,14 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Forecast pipeline: downloads and derived artefacts (rebuilt by `python -m forecast`)
+data/raw/
+data/processed/
+data/cache/
+data/archive/
+data/outputs/
+forecast/stan/build/
+
+# Third-party methodology page kept locally for reference
+fifty_plus_one/

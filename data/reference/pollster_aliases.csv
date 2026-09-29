@@ -1,0 +1,19 @@
+pattern,firm,sponsor,sponsor_bloc,notes
+^ifop for dlf$,Ifop,DLF,DRO,commissioned by Debout la France (partisan)
+^ifop(-fiducial)?(/hexagone)?$,Ifop,,,Ifop-Fiducial is Ifop's rolling tracker
+^ipsos(-sopra steria)?$,Ipsos,,,
+^(tns |kantar )?sofres$|^kantar$|^verian$,Kantar,,,Sofres → TNS Sofres → Kantar Sofres/Public → Verian
+^opinionway(-kéa)?$,OpinionWay,,,OpinionWay-Kéa is the rolling tracker
+^harris[ -]interactive$,Harris Interactive,,,now Toluna Harris Interactive
+^(louis harris|lh2)$,LH2,,,Louis Harris France became LH2 in 2005
+^bva$,BVA,,,
+^csa$,CSA,,,
+^elabe$,Elabe,,,
+^odoxa$,Odoxa,,,
+^cluster ?17$,Cluster17,,,
+^yougov$,YouGov,,,
+^atlasintel$,AtlasIntel,,,
+^future thinking$,Future Thinking,,,
+^le terrain$,Le Terrain,,,
+^dedicated research$,Dedicated Research,,,
+^redfield & wilton strategies$,Redfield & Wilton,,,

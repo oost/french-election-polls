@@ -1,0 +1,65 @@
+# Model parameters. Every value carries its provenance:
+#   post        — stated in the FiftyPlusOne methodology post
+#   law         — French electoral law
+#   assumption  — our choice where the post is silent (tune in the backtest)
+#   estimated   — a starting value that a fitted model overrides
+
+polls:
+  window_days:           {value: 90,    source: post}
+  decay_early:           {value: 0.03,  source: post, note: "≈3%/day early in the cycle"}
+  decay_late:            {value: 0.14,  source: post, note: "≈14%/day in the final two weeks"}
+  decay_ramp_start_days: {value: 45,    source: assumption}
+  decay_ramp_end_days:   {value: 14,    source: post}
+  sample_size_ref:       {value: 1000,  source: assumption}
+  sample_size_cap:       {value: 4000,  source: assumption}
+  partisan_weight:       {value: 0.5,   source: post}
+  partisan_shift_pts:    {value: 2.0,   source: post}
+  house_k_cycle:         {value: 5,     source: post, note: "cycle-wide lean kept at n/(n+5)"}
+  house_k_race:          {value: 20,    source: post, note: "race-specific lean added back at n/(n+20)"}
+  prior_cycle_decay:     {value: 0.5,   source: post, note: "each older cycle counts half as much"}
+  prior_cap_pres:        {value: 0.10,  source: post, note: "Senate-like: heavily polled"}
+  prior_cap_legi:        {value: 0.20,  source: post, note: "House-like"}
+  prior_k:               {value: 5,     source: assumption, note: "alpha = cap * W / (W + k)"}
+  mode_k:                {value: 5,     source: post, note: "mode effects fit like house effects"}
+  trend_bandwidth_days:  {value: 7.0,   source: assumption, note: "Gaussian SD of the cross-lineup trend smoother"}
+  trend_iterations:      {value: 3,     source: assumption}
+  trend_lineup_k:        {value: 5,     source: assumption}
+  trend_min_polls:       {value: 5,     source: assumption}
+  share_floor:           {value: 0.1,   source: assumption, note: "percentage points"}
+  use_drift:             {value: false, source: estimated, note: "size-drift term raised out-of-sample MAE 2.10 → 2.70 in the 2007–2022 backtest"}
+
+nowcast:
+  anchor_slack_one:      {value: 2.0,   source: post, note: "points of slack with one poll"}
+  anchor_floor:          {value: 0.3333, source: post, note: "floor reached by ~5 polls"}
+  anchor_floor_n:        {value: 5,     source: post}
+  nest_mu_prior:         {value: 0.6,   source: assumption, note: "nested-logit within-bloc substitution"}
+  nest_mu_prior_sd:      {value: 0.2,   source: assumption}
+  imputation_df:         {value: 4,     source: assumption}
+
+horizon:
+  move_a:                {value: 0.06,  source: estimated, note: "log-share sd at election eve"}
+  move_b:                {value: 0.018, source: estimated, note: "growth per sqrt(day)"}
+  bloc_share_of_var:     {value: 0.5,   source: assumption, note: "v0 split of error variance, replaced by the meta-model"}
+
+errors:
+  nu_floor:              {value: 3,     source: post, note: "df = number of training cycles, floored"}
+  runoff_rho:            {value: 0.5,   source: assumption}
+  runoff_a:              {value: 0.10,  source: estimated, note: "logit sd of runoff error at eve"}
+  runoff_b:              {value: 0.015, source: estimated}
+
+simulation:
+  n_sims:                {value: 40000, source: post}
+  n_sims_backtest:       {value: 10000, source: post}
+  seed:                  {value: 20270418, source: assumption}
+
+lean:
+  recent_weight:         {value: 0.8,   source: post, note: "80/20 blend of the last two presidentials"}
+
+legislative:
+  majority_seats:        {value: 289,   source: law}
+  n_seats:               {value: 577,   source: law}
+  qualify_registered:    {value: 0.125, source: law}
+  outright_expressed:    {value: 0.5,   source: law}
+  outright_registered:   {value: 0.25,  source: law}
+  front_republicain_sd:  {value: 0.8,   source: assumption}
+  chunk_size:            {value: 2000,  source: assumption}
