@@ -499,6 +499,35 @@ def _table_has_polling_firm_column(columns: Iterable[Any]) -> bool:
     return _find_column(columns, "polling firm", "polling organisation", "pollster") is not None
 
 
+_PLACEHOLDER_CELLS = {"", "nan", "none", "–", "-", "—", "n/a", "—n/a", "–n/a", "tbd"}
+
+
+def _is_blank_cell(value: Any) -> bool:
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return True
+    return str(value).strip().lower() in _PLACEHOLDER_CELLS
+
+
+def is_event_row(pollster_cell: Any, cells: Iterable[Any], min_same: float = 0.8) -> bool:
+    """True for timeline rows ("16 Sep 2026 | Faure, Glucksmann, … are the 5
+    candidates…") that Wikipedia spreads across every column of a polling table.
+
+    Such a row has no pollster and repeats one piece of prose in (almost) every
+    other cell. `_extract_numeric` would otherwise read digits out of the
+    prose and turn the row into a phantom poll. `cells` should exclude the
+    fieldwork-date cell.
+    """
+    if not _is_blank_cell(pollster_cell):
+        return False
+    cells = list(cells)
+    texts = [str(v).strip() for v in cells if not _is_blank_cell(v)]
+    if not texts:
+        return False
+    most_common = max(set(texts), key=texts.count)
+    is_prose = len(most_common) >= 4 and re.search(r"[^\W\d_]{3,}", most_common) is not None
+    return is_prose and texts.count(most_common) >= min_same * len(cells)
+
+
 def extract_poll_records(table: pd.DataFrame, candidates: list[str], round_type: str) -> list[dict[str, Any]]:
     """Pull validated poll rows out of one Wikipedia table.
 
@@ -526,13 +555,17 @@ def extract_poll_records(table: pd.DataFrame, candidates: list[str], round_type:
         candidate: [_extract_numeric(v) for v in table[col]]
         for candidate, col in candidate_headers.items()
     }
-    firms = [clean_pollster(v) for v in table[firm_col]]
+    raw_firms = table[firm_col].tolist()
+    firms = [clean_pollster(v) for v in raw_firms]
     samples = [_parse_sample_size(v) for v in table[sample_col]] if sample_col is not None else [None] * len(table)
+    other_cols = [c for c in table.columns if c not in (date_col, firm_col)]
 
     records: list[dict[str, Any]] = []
     for idx, fieldwork_raw in enumerate(table[date_col]):
         fieldwork = parse_fieldwork(fieldwork_raw)
         if fieldwork is None or _RESULT_ROW.search(firms[idx]):
+            continue
+        if is_event_row(raw_firms[idx], table.iloc[idx][other_cols].tolist()):
             continue
         start, end = fieldwork
 

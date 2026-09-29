@@ -386,6 +386,48 @@ def _first_round_table() -> pd.DataFrame:
     })
 
 
+_EVENT_TEXT = ("Faure, Glucksmann, Guedj, Maurel and Royal are the 5 candidates "
+               "in the left-wing primary")
+
+
+def _table_with_event_row() -> pd.DataFrame:
+    """A 2027-style table: a real poll, then a timeline row (NaN pollster,
+    one sentence repeated across every other cell) like the 16 Sep 2026 row
+    of revision 1377088060."""
+    candidates = ["Arthaud", "Mélenchon", "Roussel", "Glucksmann", "Philippe", "Retailleau", "Le Pen"]
+    real = ["1%", "17%", "2%", "10%", "13%", "7%", "35%"]
+    return pd.DataFrame({
+        "Polling firm": ["Harris Interactive", np.nan],
+        "Fieldwork date": ["22–24 Sep 2026", "16 Sep 2026"],
+        "Sample size": ["1974", _EVENT_TEXT],
+        **{c: [v, _EVENT_TEXT] for c, v in zip(candidates, real)},
+    })
+
+
+class TestIsEventRow:
+    def test_real_2027_event_row(self):
+        assert polls_helpers.is_event_row(np.nan, [_EVENT_TEXT] * 20)
+
+    def test_short_event_text_with_digits(self):
+        assert polls_helpers.is_event_row(None, ["Zemmour announces his candidacy on 17 Sep"] * 12)
+
+    def test_real_poll_is_not_event(self):
+        assert not polls_helpers.is_event_row("Ifop", ["1974", "1%", "17%", "–", "–", "35%"])
+
+    def test_row_of_dashes_is_not_event(self):
+        # A sparse lineup row: pollster missing but the repeated cells are placeholders.
+        assert not polls_helpers.is_event_row(np.nan, ["1000", "20%", "–", "–", "–", "–", "–", "–", "–"])
+
+    def test_event_row_no_longer_becomes_phantom_poll(self):
+        # Before the fix, the prose row parsed as a poll with every candidate
+        # at 5.0% (the "5" in "the 5 candidates"), summing to 35 < 105.
+        table = _table_with_event_row()
+        names = ["Arthaud", "Mélenchon", "Roussel", "Glucksmann", "Philippe", "Retailleau", "Le Pen"]
+        records = extract_poll_records(table, names, "first")
+        assert len(records) == 1
+        assert records[0]["pollster"] == "Harris Interactive"
+
+
 class TestExtractPollRecords:
     def test_first_round_table(self):
         records = extract_poll_records(_first_round_table(), ["Macron", "Le Pen", "Mélenchon", "Pécresse"], "first")
