@@ -1,0 +1,85 @@
+# Wikipedia pages used by the forecast, pinned to a revision and cached as
+# wiki_cache/{key}_{revision}.html.gz. Historical presidential pages reuse the
+# keys (= year) and revisions of polls_helpers.WIKIPEDIA_REVISIONS.
+#
+# Each table's section path (headings joined with " › ") is matched, case
+# insensitively, against the page's rules in order; the first matching rule
+# decides. No match → table skipped.
+# kind: lineup (first-round voting intention), matchup (runoff), generic
+# (bloc-level "generic candidate" polls), transfer (vote-transfer cross-tabs).
+
+rule_sets:
+  presidential_default:
+    - {match: "by (region|department|commune)|overseas|abroad", exclude: true}
+    - {match: "by first[- ]round vote", exclude: true, note: "vote-transfer cross-tabs, not parsed yet"}
+    - {match: "first round", round: first, kind: lineup}
+    - {match: "second round", round: second, kind: matchup}
+  legislative_default:
+    - {match: "constituenc|by (region|department)|seat projection|second round|vote transfer|first round vote", exclude: true}
+    - {match: "first round|national|voting intention|opinion poll", round: first, kind: generic}
+
+pages:
+  - key: "2002"
+    election: 2002_pres
+    title: Opinion_polling_for_the_2002_French_presidential_election
+    revision: 1329460026
+    rules: presidential_default
+  - key: "2007"
+    election: 2007_pres
+    title: Opinion_polling_for_the_2007_French_presidential_election
+    revision: 1341388824
+    rules: presidential_default
+  - key: "2012"
+    election: 2012_pres
+    title: Opinion_polling_for_the_2012_French_presidential_election
+    revision: 1279812574
+    rules: presidential_default
+  - key: "2017"
+    election: 2017_pres
+    title: Opinion_polling_for_the_2017_French_presidential_election
+    revision: 1213598918
+    rules: presidential_default
+  - key: "2022"
+    election: 2022_pres
+    title: Opinion_polling_for_the_2022_French_presidential_election
+    revision: 1363121499
+    rules: presidential_default
+  - key: pres2027
+    election: 2027_pres
+    title: Opinion_polling_for_the_2027_French_presidential_election
+    revision: 1388214499
+    rules:
+      - {match: "Re-run of the 2022 election", exclude: true, note: "hypothetical re-run with Macron"}
+      - {match: "^First round", round: first, kind: lineup}
+      - {match: "^Second round", round: second, kind: matchup}
+      - {match: "Generic candidates", round: first, kind: generic}
+      # The heading walker files the "Bardella runs" lineup tables under
+      # "Cluster 17 Poll" (that heading has no table of its own).
+      - {match: "Cluster 17 Poll", round: first, kind: lineup}
+
+  # Legislative national vote intention (kind: generic → party/bloc options).
+  - key: legi2012
+    election: 2012_legi
+    title: Opinion_polling_for_the_2012_French_legislative_election
+    revision: 1345364325
+    rules: legislative_default
+  - key: legi2017
+    election: 2017_legi
+    title: Opinion_polling_for_the_2017_French_legislative_election
+    revision: 1306316201
+    rules: legislative_default
+  - key: legi2022
+    election: 2022_legi
+    title: Opinion_polling_for_the_2022_French_legislative_election
+    revision: 1310486728
+    rules: legislative_default
+  - key: legi2024
+    election: 2024_legi
+    title: Opinion_polling_for_the_2024_French_legislative_election
+    revision: 1255865981
+    rules: legislative_default
+  - key: leginext
+    election: 2029_legi
+    title: Next_French_legislative_election
+    revision: 1383966200
+    rules: legislative_default

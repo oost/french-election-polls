@@ -1,0 +1,23 @@
+firm,from_year,to_year,mode,population,publication_lag_days,exclude,source
+Ifop,2000,2009,phone,certain_to_vote,2,0,assumption: phone (CATI) standard before ~2010
+Ifop,2010,2030,online,certain_to_vote,1,0,assumption
+Ipsos,2000,2011,phone,certain_to_vote,2,0,assumption
+Ipsos,2012,2030,online,certain_to_vote,1,0,assumption: Cevipof panel online from 2012
+Kantar,2000,2016,phone,certain_to_vote,2,0,assumption
+Kantar,2017,2030,online,certain_to_vote,1,0,assumption
+BVA,2000,2014,phone,certain_to_vote,2,0,assumption
+BVA,2015,2030,online,certain_to_vote,1,0,assumption
+CSA,2000,2014,phone,certain_to_vote,2,0,assumption
+CSA,2015,2030,online,certain_to_vote,1,0,assumption
+LH2,2000,2030,phone,certain_to_vote,2,0,assumption
+OpinionWay,2000,2030,online,certain_to_vote,1,0,online-only pollster
+Harris Interactive,2000,2030,online,certain_to_vote,1,0,online-only pollster
+Elabe,2000,2030,online,certain_to_vote,1,0,online-only pollster
+Odoxa,2000,2030,online,certain_to_vote,1,0,online-only pollster
+Cluster17,2000,2030,online,certain_to_vote,1,0,online-only pollster
+YouGov,2000,2030,online,certain_to_vote,1,0,online-only pollster
+AtlasIntel,2000,2030,online,certain_to_vote,1,0,online-only pollster
+Future Thinking,2000,2030,online,certain_to_vote,2,0,assumption
+Le Terrain,2000,2030,online,certain_to_vote,2,0,assumption
+Dedicated Research,2000,2030,online,certain_to_vote,2,0,assumption
+Redfield & Wilton,2000,2030,online,certain_to_vote,2,0,assumption

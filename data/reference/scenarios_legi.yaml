@@ -1,0 +1,33 @@
+# Legislative alliance scenarios — a mixture, like the presidential lineups.
+# THE PROBABILITIES AND SHARES BELOW ARE ILLUSTRATIVE DEFAULTS (judgment
+# calls to set, date and disclose), not estimates.
+
+election:
+  id: next_legi
+  # No legislative election is scheduled; the next is due by June 2029 and a
+  # dissolution could call one earlier. Forecasts are conditional on this date.
+  t1: 2027-06-13
+  t2: 2027-06-20
+
+alliances:
+  united_left:
+    probability: 0.6
+    note: one left-union candidate per seat (as NUPES 2022 / NFP 2024)
+  split_left:
+    probability: 0.4
+    note: LFI (unit RAD) runs apart from the PS/LE/PCF candidate (unit GAU)
+    lfi_share_of_left: 0.45     # assumption: LFI ≈ 11–13 of ≈ 27–28 left points in 2025 party-level polls
+
+incumbent_rerun_probability: 0.8
+turnout:
+  # National valid votes / registered voters in the first round; each seat keeps
+  # its 2024 position around it. null = the 2024 level (65.0%).
+  # Set to 0.50 on 2026-11-26 (judgment call): the assumed date follows the
+  # presidential election, and the three legislative elections that did so had
+  # 56.3% (2012), 47.6% (2017) and 46.5% (2022). 2024 was a snap election with
+  # exceptional turnout. It matters because a candidate needs 12.5% of
+  # registered voters to reach the second round.
+  expressed_over_registered: 0.50
+  relative_sd: 0.12                 # one shared draw per simulation: 90% range about 40–60%
+withdrawals:
+  front_republicain_sd: 0.8
