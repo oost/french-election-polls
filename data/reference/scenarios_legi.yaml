@@ -20,7 +20,14 @@ alliances:
 
 incumbent_rerun_probability: 0.8
 turnout:
-  expressed_over_registered: null   # null = each seat's 2024 ratio
-  relative_sd: 0.12
+  # National valid votes / registered voters in the first round; each seat keeps
+  # its 2024 position around it. null = the 2024 level (65.0%).
+  # Set to 0.50 on 2026-11-26 (judgment call): the assumed date follows the
+  # presidential election, and the three legislative elections that did so had
+  # 56.3% (2012), 47.6% (2017) and 46.5% (2022). 2024 was a snap election with
+  # exceptional turnout. It matters because a candidate needs 12.5% of
+  # registered voters to reach the second round.
+  expressed_over_registered: 0.50
+  relative_sd: 0.12                 # one shared draw per simulation: 90% range about 40–60%
 withdrawals:
   front_republicain_sd: 0.8

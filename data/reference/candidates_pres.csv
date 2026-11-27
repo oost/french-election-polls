@@ -183,6 +183,8 @@ year,candidate_id,first_name,surname,aliases,party,bloc,ran,incumbency,experienc
 2027,HIDALGO_ANNE,Anne,Hidalgo,,PS,GAU,,0,2,,,
 2027,CAZENEUVE_BERNARD,Bernard,Cazeneuve,,LC,GAU,,0,3,,,
 2027,GLUCKSMANN_RAPHAEL,Raphaël,Glucksmann,,PP,GAU,,0,1,,,
+2027,GUEDJ_JEROME,Jérôme,Guedj,,PS,GAU,,0,1,,,lost the Oct 2026 Socialist primary
+2027,MAUREL_EMMANUEL,Emmanuel,Maurel,,GRS,GAU,,0,1,,,lost the Oct 2026 Socialist primary
 2027,ATTAL_GABRIEL,Gabriel,Attal,,RE,CEN,,0.5,3,,,presidential camp
 2027,BORNE_ELISABETH,Élisabeth,Borne,,RE,CEN,,0.5,3,,,presidential camp
 2027,BRAUN_PIVET_YAEL,Yaël,Braun-Pivet,,RE,CEN,,0.5,2,,,presidential camp
@@ -192,6 +194,7 @@ year,candidate_id,first_name,surname,aliases,party,bloc,ran,incumbency,experienc
 2027,LECORNU_SEBASTIEN,Sébastien,Lecornu,,RE,CEN,,0.5,3,,,presidential camp
 2027,BAYROU_FRANCOIS,François,Bayrou,,MD,CEN,,0.5,3,,,presidential camp
 2027,PHILIPPE_EDOUARD,Édouard,Philippe,,HOR,CEN,,0.5,3,,,presidential camp
+2027,LAGARDE_CHRISTINE,Christine,Lagarde,,IND,CEN,,0,2,,,column on the page; no poll values yet
 2027,MACRON_EMMANUEL,Emmanuel,Macron,,RE,CEN,,1,3,,,term-limited; appears only in re-run tables
 2027,VILLEPIN_DOMINIQUE_DE,Dominique,Villepin,,LFH,DIV,,0,3,,,
 2027,BERTRAND_XAVIER,Xavier,Bertrand,,NF,DRO,,0,2,,,
@@ -205,11 +208,14 @@ year,candidate_id,first_name,surname,aliases,party,bloc,ran,incumbency,experienc
 2027,LE_PEN_MARINE,Marine,Le Pen,,RN,EXD,,0,1,,,
 2027,BARDELLA_JORDAN,Jordan,Bardella,,RN,EXD,,0,1,,,
 2027,ZEMMOUR_ERIC,Éric,Zemmour,,R!,EXD,,0,0,,,
+2027,PHILIPPOT_FLORIAN,Florian,Philippot,,LP,EXD,,0,1,,,declared 10 Nov 2026; no poll values yet
 2027,KNAFO_SARAH,Sarah,Knafo,,R!,EXD,,0,1,,,
 2027,VILLIERS_PHILIPPE_DE,Philippe,Villiers,,R!,EXD,,0,2,,,
 2027,HANOUNA_CYRIL,Cyril,Hanouna,,DIV,DIV,,0,0,,,
 2027,LECLERC_MICHEL_EDOUARD,Michel-Édouard,Leclerc,,DIV,DIV,,0,0,,,
 2027,RINER_TEDDY,Teddy,Riner,,DIV,DIV,,0,0,,,
+2027,POLONY_NATACHA,Natacha,Polony,,DIV,DIV,,0,0,,,declared 13 Oct 2026
+2027,ASSELINEAU_FRANCOIS,François,Asselineau,,UPR,DIV,,0,0,,,column on the page; no poll values yet
 2027,SEBASTIEN_PATRICK,Patrick,Sébastien,,DIV,DIV,,0,0,,,
 1981,GISCARD_VALERY,Valéry,Giscard d'Estaing,Giscard,UDF,CEN,1,1,3,28.32,48.24,sitting president
 1981,MITTERRAND_FRANCOIS,François,Mitterrand,,PS,GAU,1,0,2,25.85,51.76,

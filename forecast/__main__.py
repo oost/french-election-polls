@@ -13,6 +13,12 @@ import argparse
 import sys
 from datetime import date
 
+import matplotlib
+
+# The command line only saves charts to files. Set the backend here, not in the
+# chart modules, so importing them in a notebook keeps the inline backend.
+matplotlib.use("Agg")
+
 
 def _cmd_ingest(args: argparse.Namespace) -> int:
     from forecast.ingest.build import write_presidential
@@ -21,6 +27,10 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     print(f"events: {events.height}; skipped rows: {report.rows_by_reason}")
     if report.unmatched_headers:
         print("unmatched headers:", ", ".join(sorted(report.unmatched_headers)))
+    from forecast.ingest.turnout import load_abstention_polls, load_transfer_polls
+    abstention, year = load_abstention_polls(), long["year"].max()
+    print(f"abstention polls: {abstention.height} ({abstention.filter(abstention['year'] == year).height} for {year}); "
+          f"vote-transfer poll rows: {load_transfer_polls().height}")
     return 0
 
 

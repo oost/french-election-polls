@@ -30,9 +30,9 @@ simulations. The design is in [`PLAN.md`](PLAN.md); how to run it is in
 ## Running
 
 ```bash
-python -m venv venv
+python3.15 -m venv venv
 source venv/bin/activate
-pip install polars pandas numpy matplotlib beautifulsoup4 lxml pytest
+pip install -e '.[stan,dev,docs,xlsx,pdf]' jupyter   # Stan models also need CmdStan: install_cmdstan
 
 # tests
 pytest -q
@@ -178,14 +178,19 @@ pip install -e '.[stan,dev]'
 python -c 'import cmdstanpy; cmdstanpy.install_cmdstan()'   # once; builds CmdStan
 
 python -m forecast ingest                      # Wikipedia pages → data/processed/polls_long.parquet
-python -m forecast backtest --cycles 2002 2007 2012 2017 2022   # ≈ 40 min; writes data/archive/
-python -m forecast run --as-of 2026-09-28      # 2027 presidential forecast → data/outputs/
+python -m forecast backtest --cycles 2002 2007 2012 2017 2022   # ≈ 10 min (≈ 40 the first time: Stan fits are cached); writes data/archive/
+python -m forecast run --as-of 2026-11-27      # 2027 presidential forecast → data/outputs/
 python -m forecast legi-backtest               # legislative backtest, 2017–2024
-python -m forecast legi --as-of 2026-09-28     # next legislative election
+python -m forecast legi --as-of 2026-11-27     # next legislative election
 
 pytest -q            # fast offline suite
 pytest -m slow       # compile the Stan models and check they recover known parameters
 ```
+
+The last cell of [`forecast_2027.ipynb`](forecast_2027.ipynb) writes everything
+(headline numbers, charts and tables for both forecasts, the candidate
+scenarios and the backtest) to one PDF,
+`data/outputs/forecast_2027_<as_of>.pdf` (needs the `pdf` extra).
 
 `run` and `legi` use the ensemble and error meta-model when a backtest
 archive exists. Without one, `run` falls back to a polls-only forecast.
@@ -201,14 +206,15 @@ Outputs are data, not code, and are gitignored: `data/raw`, `data/processed`,
 | `forecast/fundamentals/` | Stan softmax dynamic linear model with random-walk coefficients. Presidential predictors: bloc baseline, incumbency, experience, personal vote. |
 | `forecast/ensemble/` | Precision-weighted ensemble with a stacking multiplier chosen out of sample. |
 | `forecast/errors/` | Stan error meta-model: shared shocks with σ(h) = a + b·√h, an individual-error multiplier, and Student-t errors with ν = number of training cycles. |
-| `forecast/simulate/` | Lineup scenario mixture, the runoff transfer model, and the presidential simulator (antithetic draws). |
+| `forecast/simulate/` | Lineup scenario mixture, the runoff transfer model, the turnout model (who stays home in the runoff, fitted on the runoffs since 1965), and the presidential simulator (antithetic draws). |
 | `forecast/legislative/` | Seat data, lean, lagged results and incumbency; seat now-cast; two-round rules, withdrawals and transfers; vote-pattern clusters; chunked 577-seat simulator; backtest. |
 | `forecast/backtest/` | Strict out-of-sample presidential backtest, with metrics and charts. |
 
 ### Judgment inputs (set, date and disclose them)
 
-- [`scenarios_pres_2027.yaml`](data/reference/scenarios_pres_2027.yaml): the probability of each candidate lineup. For example, Le Pen or Bardella as RN candidate, the Socialist primary winner, and whether Attal runs.
-- [`scenarios_legi.yaml`](data/reference/scenarios_legi.yaml): the assumed legislative election date, united vs split left, the incumbents' re-run rate, and the turnout spread.
+- [`scenarios_pres_2027.yaml`](data/reference/scenarios_pres_2027.yaml): the probability of each candidate lineup. For example, Le Pen or Bardella as RN candidate, which of Philippe, Attal, Retailleau and Lisnard make the ballot, and whether Tondelier, Riner and Polony run. Its header lists the events it was written against; update it whenever the field changes.
+- [`scenarios_legi.yaml`](data/reference/scenarios_legi.yaml): the assumed legislative election date, united vs split left, the incumbents' re-run rate, and the turnout level and spread.
+- `errors.far_right_runoff_probability` in [`config/model.yaml`](config/model.yaml): the chance (0.5) that a far-right finalist again does worse in the runoff than the polls say, as in 2002, 2017 and 2022. The size of the shortfall is estimated; the probability is a judgment call.
 
 ### Known limitations
 

@@ -37,7 +37,10 @@ from forecast.polls.horizon import HorizonModel, fit_horizon_model, historical_e
 from forecast.polls.drift import DriftModel, fit_drift
 from forecast.polls.lineups import fit_nested_logit, imputation_sigma, nowcast_lineup, race_observations
 from forecast.simulate.presidential import SimInput, candidate_sd, simulate_presidential
-from forecast.simulate.runoff import RunoffModel, fit_transfer_model, matchup_observations, _logit
+from forecast.simulate.runoff import (
+    RunoffModel, far_right_runoff_bias, fit_transfer_model, matchup_observations, _logit,
+)
+from forecast.simulate.turnout import build_turnout_model
 from forecast.simulate.scenarios import Lineup
 
 PRES_CYCLES = (2002, 2007, 2012, 2017, 2022)
@@ -66,6 +69,8 @@ class CycleModels:
     runoff_a: float
     runoff_b: float
     drift: DriftModel
+    runoff_unpolled: float | None = None    # set with errors.runoff_by_polled
+    far_right: tuple[float, float, float] | None = None   # (probability, mean, sd), from earlier runoffs only
 
 
 def fit_runoff_scale(archive: pl.DataFrame, default: tuple[float, float]) -> tuple[float, float]:
@@ -84,6 +89,26 @@ def fit_runoff_scale(archive: pl.DataFrame, default: tuple[float, float]) -> tup
     return float(np.exp(sol.x[0])), float(np.exp(sol.x[1]))
 
 
+def fit_runoff_scales(archive: pl.DataFrame, errors) -> tuple[float, float, float]:
+    """(a, b, unpolled): σ_r(h) = a + b·√h for matchups pollsters have tested,
+    and a flat σ for those they have not (`errors.runoff_by_polled`).
+
+    A matchup the polls cover and one only the transfer model predicts miss
+    by very different amounts, so each kind is scaled on its own past
+    runoffs. Polled: the prior curve `runoff_a + runoff_b·√h` times one
+    factor. Snapshots of one election share one error, so each election counts
+    once, and the priors count as `runoff_prior_weight` elections."""
+    a0, b0, u0, k0 = errors.runoff_a, errors.runoff_b, errors.runoff_unpolled, errors.runoff_prior_weight
+    if archive.is_empty():
+        return a0, b0, u0
+    polled, unpolled = archive.filter(pl.col("polled_matchup")), archive.filter(~pl.col("polled_matchup"))
+    ratios = [float(np.mean((g["err_logit"].to_numpy() / (a0 + b0 * np.sqrt(g["days_to_t2"].to_numpy()))) ** 2))
+              for _, g in polled.group_by("cycle")]
+    factor = float(np.sqrt((k0 + sum(ratios)) / (k0 + len(ratios))))
+    squares = [float(np.mean(g["err_logit"].to_numpy() ** 2)) for _, g in unpolled.group_by("cycle")]
+    return a0 * factor, b0 * factor, float(np.sqrt((k0 * u0 ** 2 + sum(squares)) / (k0 + len(squares))))
+
+
 def cycle_models(cycle: int, archive: pl.DataFrame, runoff_archive: pl.DataFrame, long: pl.DataFrame,
                  registry: CandidateRegistry, features: PresFeatures, cfg: Config) -> CycleModels:
     earlier = tuple(c for c in PRES_CYCLES if c < cycle)
@@ -98,9 +123,18 @@ def cycle_models(cycle: int, archive: pl.DataFrame, runoff_archive: pl.DataFrame
     else:
         errors = fit_error_model(past, ("bloc",), nu_floor=cfg.errors.nu_floor, thin_every=2)
     r_past = runoff_archive.filter(pl.col("cycle") < cycle) if not runoff_archive.is_empty() else runoff_archive
-    ra, rb = fit_runoff_scale(r_past, (cfg.errors.runoff_a, cfg.errors.runoff_b))
+    if cfg.errors.runoff_by_polled:
+        ra, rb, ru = fit_runoff_scales(r_past, cfg.errors)
+    else:
+        (ra, rb), ru = fit_runoff_scale(r_past, (cfg.errors.runoff_a, cfg.errors.runoff_b)), None
     drift = fit_drift(past) if cfg.polls.use_drift and not past.is_empty() else DriftModel()
-    return CycleModels(cycle, hm, fund, precision, errors, ra, rb, drift)
+    far_right = None
+    if cfg.errors.far_right_runoff_probability > 0:
+        bias = far_right_runoff_bias(long, registry, cycle, cfg.errors.far_right_runoff_noise,
+                                     cfg.errors.far_right_runoff_prior_sd, cfg.errors.far_right_runoff_days)
+        if bias is not None:
+            far_right = (cfg.errors.far_right_runoff_probability, bias[0], bias[1])
+    return CycleModels(cycle, hm, fund, precision, errors, ra, rb, drift, ru, far_right)
 
 
 def snapshot(
@@ -136,9 +170,16 @@ def snapshot(
     inp = SimInput(tuple(ballot), ens.mu, ind_sd, tuple(blocs[c] for c in ballot),
                    {b: models.errors.shock_sd("bloc", h) for b in set(blocs[c] for c in ballot)})
     runoff, runoff_rows = _runoff_model(cycle, polls, as_of, d2, ballot, ens.mu, nl, blocs, cfg, registry)
+    # turnout as it could be known then: earlier elections, abstention polls published by `as_of`
+    turnout = (build_turnout_model(cycle, as_of, blocs, cfg.turnout,
+                                   parties={c.candidate_id: c.party for c in registry.candidates(cycle)})
+               if cfg.turnout.enabled else None)
     sims = simulate_presidential([lineup], {lineup.key: inp}, runoff, days_out_t2=-d2,
                                  nu=models.errors.nu, runoff_a=models.runoff_a, runoff_b=models.runoff_b,
-                                 runoff_rho=cfg.errors.runoff_rho, n_sims=n_sims, seed=seed,
+                                 runoff_rho=cfg.errors.runoff_rho, n_sims=n_sims, seed=seed, turnout=turnout,
+                                 runoff_unpolled=models.runoff_unpolled,
+                                 net_of_first_round=cfg.errors.runoff_net_of_first_round,
+                                 far_right=models.far_right,
                                  sd_is_t_scale=models.errors.source == "stan")
     ci = {c: i for i, c in enumerate(sims.candidates)}
 

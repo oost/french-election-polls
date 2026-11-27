@@ -136,3 +136,44 @@ class RunoffModel:
         base = _logit(self.expected(a, b, voters, v_mean))
         shift = _logit(self.transfer.share_a(a, b, voters, v_sim)) - _logit(self.transfer.share_a(a, b, voters, v_mean))
         return base + shift
+
+
+FAR_RIGHT = "EXD"
+
+
+def far_right_runoff_bias(long, registry, before_year: int, noise: float, prior_sd: float,
+                          days: int = 7) -> tuple[float, float, dict[int, float]] | None:
+    """How far-right finalists did against their final runoff polls in the
+    elections before `before_year`: (mean, sd, shortfall by year), in logit of
+    the far-right finalist's share. None without a past case.
+
+    One observation per runoff with exactly one far-right finalist: the result
+    against the mean of the polls of that matchup ending in the last `days`
+    days. The cases are pooled toward zero: each carries the ordinary error of
+    final runoff polls (`noise`), and the prior on the shortfall is
+    N(0, `prior_sd`)."""
+    import polars as pl
+    from forecast.ingest.wiki_long import election_dates
+    by_year: dict[int, float] = {}
+    for year in sorted(set(long["year"].unique().to_list())):
+        if year >= before_year:
+            continue
+        finalists = [c for c in registry.ballot(year) if c.result_t2 is not None]
+        far = [c for c in finalists if c.bloc == FAR_RIGHT]
+        if len(finalists) != 2 or len(far) != 1:
+            continue
+        _, t2 = election_dates(year)
+        ids = sorted(c.candidate_id for c in finalists)
+        polls = long.filter((pl.col("year") == year) & (pl.col("kind") == "matchup") & (pl.col("lineup_id") == "|".join(ids))
+                            & (pl.col("fieldwork_end") < t2) & ((t2 - pl.col("fieldwork_end")).dt.total_days() <= days))
+        if polls.is_empty():
+            continue
+        per_poll = polls.group_by("row_id").agg(pl.col("share").filter(pl.col("option_id") == far[0].candidate_id).first().alias("far"),
+                                                 pl.col("share").sum().alias("total"))
+        polled = float((per_poll["far"] / per_poll["total"]).mean())
+        result = far[0].result_t2 / sum(c.result_t2 for c in finalists)
+        by_year[year] = float(_logit(result) - _logit(polled))
+    if not by_year:
+        return None
+    precision = len(by_year) / noise ** 2 + 1 / prior_sd ** 2
+    return float(sum(by_year.values()) / noise ** 2 / precision), float(np.sqrt(1 / precision)), by_year

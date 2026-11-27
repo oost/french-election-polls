@@ -13,6 +13,12 @@ import yaml
 from forecast import paths
 
 
+def option_candidates(option: str | None) -> set[str]:
+    """Candidates a slot option puts on the ballot: none for null, several for
+    an option joined with '+' (e.g. "PHILIPPE_EDOUARD+LISNARD_DAVID")."""
+    return set(option.split("+")) if option else set()
+
+
 @dataclass(frozen=True)
 class Lineup:
     candidates: tuple[str, ...]      # sorted candidate ids
@@ -66,7 +72,8 @@ class ScenarioSpec:
     def candidates(self) -> set[str]:
         out = set(self.fixed) | set(self.optional) | {c for d in self.decisions for c in d.pool}
         for opts in self.slots.values():
-            out |= {k for k in opts if k}
+            for k in opts:
+                out |= option_candidates(k)
         return out
 
     def enumerate(self) -> list[Lineup]:
@@ -85,7 +92,7 @@ class ScenarioSpec:
                     p *= self.optional[name] if on else 1 - self.optional[name]
                 if p <= 0:
                     continue
-                cands = (set(self.fixed) | {c for c in chosen.values() if c}
+                cands = (set(self.fixed) | set().union(*map(option_candidates, chosen.values()))
                          | {n for n, on in zip(opt_names, flags) if on}
                          | {c for d in self.decisions for c in d.pool})   # decided later, per simulation
                 if self._violates(chosen, cands):
@@ -95,10 +102,15 @@ class ScenarioSpec:
         return [Lineup(l.candidates, l.probability / total, l.slots) for l in out]
 
     def _violates(self, chosen: dict[str, str | None], cands: set[str]) -> bool:
+        """A rule applies when its `if` slot choices all hold (always, without
+        an `if`). It is violated by a lineup containing any `exclude`
+        candidate, or none of the `require_any` candidates."""
         for rule in self.constraints:
             cond = rule.get("if", {})
             if all(chosen.get(slot) == opt for slot, opt in cond.items()):
                 if cands & set(rule.get("exclude", [])):
+                    return True
+                if rule.get("require_any") and not cands & set(rule["require_any"]):
                     return True
         return False
 

@@ -3,9 +3,10 @@
 Each simulation draws a lineup from the scenario mixture, first-round shares
 (anchored now-cast + Student-t errors on the log-share scale, drawn in
 antithetic pairs so they cancel exactly and never move the central estimate),
-applies the two-round rule, and draws the runoff. Runoff errors are
-correlated with the finalists' first-round surprises (the counterpart of the
-post's national shock shared across chambers).
+applies the two-round rule, and draws the runoff. Runoff errors can be
+correlated with the finalists' first-round surprises (`runoff_rho`, the
+counterpart of the post's national shock shared across chambers; the config
+sets it to 0 since the backtest scored best without it).
 """
 from __future__ import annotations
 
@@ -15,8 +16,9 @@ import numpy as np
 
 from forecast.polls.horizon import HorizonModel
 from forecast.polls.lineups import LineupForecast
-from forecast.simulate.runoff import RunoffModel
+from forecast.simulate.runoff import FAR_RIGHT, RunoffModel
 from forecast.simulate.scenarios import Lineup, sample_lineups
+from forecast.simulate.turnout import TurnoutModel
 
 
 def antithetic_t(rng: np.random.Generator, shape: tuple[int, ...], nu: float, unit_variance: bool = True) -> np.ndarray:
@@ -69,6 +71,17 @@ class PresSims:
     finalists: np.ndarray         # (N, 2) candidate indices (second = -1 if outright win)
     winner: np.ndarray            # (N,) candidate index
     runoff_share: np.ndarray      # (N,) winner's runoff share (NaN if outright)
+    # with a turnout model (else None): voters / registered in each round, and
+    # valid votes / registered in the runoff (NaN without a runoff)
+    turnout_t1: np.ndarray | None = None
+    turnout_t2: np.ndarray | None = None
+    valid_t2: np.ndarray | None = None
+    # runoff turnout minus what that simulation's first round would give without
+    # mobilisation shocks (points of registered voters)
+    turnout_surprise: np.ndarray | None = None
+    # with the far-right runoff scenario (else None): whether each simulation drew
+    # "the far right does worse than its runoff polls again"
+    far_right_shortfall: np.ndarray | None = None
 
     @property
     def n(self) -> int:
@@ -126,10 +139,32 @@ def simulate_presidential(
     seed: int = 0,
     sd_is_t_scale: bool = False,
     decision: Decision | None = None,
+    turnout: TurnoutModel | None = None,
+    runoff_unpolled: float | None = None,
+    net_of_first_round: bool = False,
+    residual_floor: float = 0.5,
+    far_right: tuple[float, float, float] | None = None,
 ) -> PresSims:
     """`inputs` must hold every lineup a simulation can end up with: the
     scenario lineups and, with a `decision`, each of them with any subset of
-    the decision pool removed."""
+    the decision pool removed.
+
+    With a `turnout` model each simulation also draws first-round turnout and,
+    in the runoff, mobilisation shocks that move both participation and the
+    result (see forecast/simulate/turnout.py). They use their own random
+    stream, so the other draws are the same with and without it.
+
+    The runoff error sd is `runoff_a + runoff_b·√days_out_t2`, or
+    `runoff_unpolled` for a matchup without polls when that is given. It was
+    calibrated on the whole gap between a forecast and the runoff result. The
+    turnout shocks carry part of that gap; so does the simulated first round,
+    and with `net_of_first_round` its part is taken out too. The error keeps
+    at least `residual_floor` of its sd.
+
+    `far_right` = (probability, mean, sd): with that probability a simulation
+    is one where a far-right finalist facing another bloc does worse than
+    expected in the runoff, by a draw from N(mean, sd) on the logit of their
+    share (see `runoff.far_right_runoff_bias`)."""
     rng = np.random.default_rng(seed)
     candidates = sorted({c for key in inputs for c in inputs[key].candidates}
                         | {c for l in lineups for c in l.candidates})
@@ -141,6 +176,17 @@ def simulate_presidential(
     winner = np.full(N, -1)
     runoff_share = np.full(N, np.nan)
     sigma_r = runoff_a + runoff_b * np.sqrt(max(days_out_t2, 0))
+    turnout_t1 = turnout_t2 = valid_t2 = valid_t1 = surprise = None
+    shortfall = shortfall_size = None
+    if far_right is not None:
+        frng = np.random.default_rng([seed, 2])
+        shortfall = frng.random(N) < far_right[0]
+        shortfall_size = far_right[1] + far_right[2] * frng.standard_normal(N)
+    if turnout is not None:
+        trng = np.random.default_rng([seed, 1])
+        turnout_t1 = 1 / (1 + np.exp(-(turnout.t1[0] + turnout.t1[1] * trng.standard_normal(N))))
+        valid_t1 = turnout_t1 * (1 - turnout.blank1)
+        turnout_t2, valid_t2, surprise = np.full(N, np.nan), np.full(N, np.nan), np.full(N, np.nan)
     unit_var = not sd_is_t_scale
     tvar = 1.0 if unit_var else nu / (nu - 2)     # variance of one unscaled t_ν draw is ν/(ν−2)
     f = decision.realised if decision is not None else 0.0
@@ -156,7 +202,7 @@ def simulate_presidential(
         zc = {c: (antithetic_t(rng, (n,), nu, unit_var), antithetic_t(rng, (n,), nu, unit_var))
               for c in base.candidates}
         zb = {g: (antithetic_t(rng, (n,), nu, unit_var), antithetic_t(rng, (n,), nu, unit_var))
-              for g in set(base.blocs)}
+              for g in sorted(set(base.blocs))}   # sorted: set order changes between processes
 
         def errors(inp: SimInput, part: str) -> tuple[np.ndarray, np.ndarray]:
             w = {"before": (np.sqrt(f), 0.0), "total": (np.sqrt(f), np.sqrt(1 - f))}[part]
@@ -208,13 +254,38 @@ def simulate_presidential(
             eps = antithetic_t(rng, (m_,), nu)   # runoff error sd is a normal-likelihood sd
             runoff_rows = np.where(~outright)[0]
             pairs = {(int(a), int(b)) for a, b in zip(first[runoff_rows], second[runoff_rows])}
-            for a, b in pairs:
+            pos = turnout.positions(cands) if turnout is not None else None
+            for a, b in sorted(pairs):
                 m = runoff_rows[(first[runoff_rows] == a) & (second[runoff_rows] == b)]
                 lg = runoff.simulate_logit(cands[a], cands[b], cands, v_mean, v[m])
+                polled = tuple(sorted((cands[a], cands[b]))) in runoff.polled
+                sigma = sigma_r if polled or runoff_unpolled is None else runoff_unpolled
+                carried = float(np.var(lg)) if net_of_first_round and len(m) >= 30 else 0.0
+                floor = residual_floor
+                if turnout is not None:
+                    carried, floor = carried + turnout.abstention.share_var, turnout.residual_floor
+                sigma = float(np.sqrt(max(sigma ** 2 - carried, (floor * sigma) ** 2)))
+                if turnout is not None:
+                    am = turnout.abstention
+                    gap = am.solve_gap(pos, a, b, v_mean, runoff.expected(cands[a], cands[b], cands, v_mean))
+                    mu_tau, sd_tau = turnout.shock_prior("|".join(sorted((cands[a], cands[b]))), pos, a, b, v_mean, gap)
+                    tau = mu_tau + sd_tau * trng.standard_normal(len(m))
+                    own = am.sd_electorate * trng.standard_normal((len(m), len(cands)))   # each electorate's shock
+                    nonvoters = (1 - valid_t1[r[m]]) / valid_t1[r[m]]
+                    shift, ratio, ratio0 = am.effect(pos, a, b, v[m], nonvoters, gap, tau, own, base=mu_tau)
+                    lg = lg + shift
+                    valid_t2[r[m]] = np.minimum(valid_t1[r[m]] * ratio, 0.99)
+                    turnout_t2[r[m]] = turnout.runoff_turnout(valid_t2[r[m]])
+                    expected = turnout.runoff_turnout(np.minimum(valid_t1[r[m]] * ratio0, 0.99))
+                    surprise[r[m]] = 100 * (turnout_t2[r[m]] - expected)
+                if far_right is not None and (inp.blocs[a] == FAR_RIGHT) != (inp.blocs[b] == FAR_RIGHT):
+                    side = 1.0 if inp.blocs[a] == FAR_RIGHT else -1.0        # lg is the logit of a's share
+                    lg = lg + side * shortfall[r[m]] * shortfall_size[r[m]]
                 shock = (zstd[m, a] - zstd[m, b]) / np.sqrt(2)
-                lg = lg + sigma_r * (np.sqrt(runoff_rho) * shock + np.sqrt(1 - runoff_rho) * eps[m])
+                lg = lg + sigma * (np.sqrt(runoff_rho) * shock + np.sqrt(1 - runoff_rho) * eps[m])
                 share_a = 1 / (1 + np.exp(-lg))
                 a_wins = share_a > 0.5
                 winner[r[m]] = np.where(a_wins, cols[a], cols[b])
                 runoff_share[r[m]] = 100 * np.where(a_wins, share_a, 1 - share_a)
-    return PresSims(candidates, lineups, idx, shares, finalists, winner, runoff_share)
+    return PresSims(candidates, lineups, idx, shares, finalists, winner, runoff_share,
+                    turnout_t1, turnout_t2, valid_t2, surprise, shortfall)

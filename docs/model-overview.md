@@ -10,7 +10,7 @@ A poll is a noisy, biased measurement of an election that hasn't happened yet. T
 
 1. **Clean the measurements.** It combines polls into an average, correcting for pollster lean and for age.
 2. **Add a second, independent opinion.** A "fundamentals" model predicts the result from history alone and knows nothing about current polls. Each opinion's weight depends on how accurate it has been out of sample.
-3. **Describe how wrong the combined estimate might be, then simulate.** A model of its own past errors sets the size of the error. The election is then simulated 40,000 times, including the runoff. Probabilities are the fractions of simulations: "Le Pen wins 49%" means she won in 49% of them.
+3. **Describe how wrong the combined estimate might be, then simulate.** A model of its own past errors sets the size of the error. The election is then simulated 40,000 times, including the runoff. Probabilities are the fractions of simulations: "Le Pen wins 69%" means she won in 69% of them.
 
 ## Pipeline
 
@@ -124,13 +124,18 @@ The trend is the counterpart of the post's generic-ballot adjustment. A poll fro
 
 This follows the post's § 3.1.2 (its now-cast for unpolled seats). A scenario can contain a lineup no pollster has tested exactly, for example Le Pen + Philippe + Attal + Glucksmann + Villepin. The model predicts it with a **nested logit**:
 
-$$P(j) = P(\text{bloc } b)\cdot P(j\mid b),\qquad P(j\mid b)=\frac{e^{u_j/\mu_b}}{\sum_{k\in b}e^{u_k/\mu_b}}$$
+$$P(j) = P(\text{group } g)\cdot P(\text{bloc } b\mid g)\cdot P(j\mid b),\qquad P(j\mid b)=\frac{e^{u_j/\mu_b}}{\sum_{k\in b}e^{u_k/\mu_b}}$$
 
 - $u_j$ is a candidate's strength.
 - $\mu_b\in(0,1]$ says how loyal a bloc's voters are: when one centrist drops out, what share goes to the other centrist rather than elsewhere?
-- $u$ and $\mu$ are fitted to every race's current average; races tested side by side in one poll pin $\mu$ down.
+- $\lambda_g\in(0,1]$ does the same one level up, for blocs grouped together in `config/model.yaml` (`nest_groups`). The centre and the right form one group. When a bloc empties completely, a small $\lambda_g$ sends its voters to the other bloc in its group rather than across the field in proportion to size. Every other bloc is a group of its own, where $\lambda$ drops out and the model is a plain nested logit.
+- $u$, $\mu$ and $\lambda$ are fitted to every race's current average; races tested side by side in one poll pin $\mu$ and $\lambda$ down. All share one prior, 0.6 ± 0.2.
+
+Why the group: in November 2026 pollsters tested lineups with only one of Philippe, Attal, Retailleau and Lisnard. Without grouping, the model put that candidate 4 points below those polls when they were left out of the fit, because the emptied bloc's voters went mostly to Le Pen and Mélenchon. With the group ($\lambda \approx 0.70$) the gap is 2 points, and the error on other lineups barely changes. On the 2002–2022 backtest the change is neutral: error, interval coverage and Brier scores move by less than 0.03 points or 2%, slightly better for centre and right candidates in 2002 and 2012 and slightly worse in 2017 and 2022. No past cycle had polls of a lone centre/right candidate to test it on directly.
 
 Lineups that *were* polled are then anchored to their own average. The final estimate is the poll average plus the now-cast's disagreement with it, clipped to ±2 points with one poll, shrinking to ±⅓ point by five polls (post).
+
+A lineup counts as polled when some race in the 90-day window has the same *major* candidates. Major means what it means when the polls are grouped into races: a median of at least 2% across the cycle's polls. Minor candidates may differ, so the race average is first rescaled to the share the now-cast gives the candidates both have. A polled lineup carries its race's poll count and sampling error; an unpolled one carries the imputation error instead.
 
 The model's error on lineups it didn't see is estimated by leaving each race out in turn, and is added to the uncertainty of unpolled lineups.
 
@@ -193,30 +198,93 @@ Each level's sd follows $a+b\sqrt{\text{days}}$. The likelihood is a Student-t w
 
 The presidential simulation repeats these steps 40,000 times.
 
-1. **Lineup.** Draw one from `scenarios_pres_2027.yaml`: the RN candidate (Le Pen 95%), the Socialist primary winner, and whether optional candidates run.
-2. **Mid-campaign decisions.** Draw the error that will have played out by 15 January 2027: about 43% of the total variance. Compute the January polls, then apply the centrist rule:
-   - if the leading centrist polls above 15%, they run alone;
-   - otherwise the top two, plus anyone above 10%, run.
+1. **Lineup.** Draw one from `scenarios_pres_2027.yaml`: the RN candidate (Le Pen 95%), which of Philippe, Attal, Retailleau and Lisnard are on the ballot (one draw over the combinations, after the January primary and any withdrawals), and whether each optional candidate runs. Constraints can remove combinations that cannot happen.
+2. **Mid-campaign decisions** (optional; the 2027 file has none since 26 November 2026). A scenario file can instead leave a choice to the polls on a given date. The simulation then draws the error that will have played out by that date and applies the rule to the polls of that moment: the leader of a pool runs alone above a threshold, otherwise the top two plus anyone above a second threshold run. Until 26 November the 2027 file used this for Philippe and Attal on 15 January.
 3. **First-round shares.** Take the ensemble mean, add the rest of the error (shared bloc shocks plus individual shocks, all Student-t), then apply a softmax. Shocks are drawn in ± pairs (antithetic), so they average to exactly zero and never move the central estimate (post).
 4. **Round-one outcome.** A candidate above 50% wins outright. Otherwise the top two go through.
 5. **Runoff.**
    - Start from the matchup's polling average, if one exists.
    - Otherwise use a **transfer model**: each first-round electorate splits between the two finalists and abstention according to left–right distance and candidate appeal.
    - Move the runoff mean with the simulated first round, so a first-round surprise carries into round two.
-   - Add a runoff error correlated with the finalists' first-round shocks.
+   - Draw the **turnout shocks** (next section) and add their effect on the result.
+   - Add a runoff error (see *The runoff error* below).
+
+### The runoff error
+
+**Code:** `fit_runoff_scales` in `forecast/backtest/harness.py`; `errors:` in `config/model.yaml`.
+
+The runoff error is what remains uncertain about a runoff once the simulated first round and the turnout shocks have had their effect. Its size is measured on past forecasts: the gap between the runoff share the model expected on each forecast date and the result.
+
+- **Polled and unpolled matchups are scaled separately** (since 27 November 2026). A matchup the pollsters have tested misses by far less than one only the transfer model predicts. The runoffs of 2007–2022, all polled, missed by 0.12–0.20 on the logit scale (3 to 5 points of vote share), less near the vote. In 2002 the Chirac–Le Pen runoff had not been polled, and the miss was 0.46. Before, one scale was fitted on all five: 0.25 at every horizon.
+  - Polled: $\sigma_r(h) = f \cdot (a + b\sqrt{h})$, the prior curve (`runoff_a`, `runoff_b`) times one factor $f$ fitted on past polled runoffs.
+  - Unpolled: one flat value, a prior of 0.40 pulled toward past unpolled misses.
+  - Weekly forecasts of one election share one error, so each election counts once. The priors count as two elections.
+- **The first round is not counted twice** (since 27 November 2026). The measured gap already contains whatever the first round did to the runoff. The simulation models that separately, so the variance its first-round draws produce for a matchup is taken out of that matchup's error. The same is done for the turnout shocks. The error keeps at least half its size.
+- **No momentum term.** The error can be correlated with the finalists' first-round surprises (`runoff_rho`). That correlation was 0.5 by assumption until 26 November 2026 and is now 0: backtests at 0, 0.25, 0.5 and 0.75 scored best at 0, in four of the five elections. With it, any challenger who qualified by surprise got a second boost in the runoff, on top of their larger first-round base.
+
+Together the two changes of 27 November improved the backtest in all five elections (Brier score for P(win) 0.031 → 0.029). Candidates the model gave a 50–70% chance of winning had won 88% of the time before, and 77% after.
+
+**The far-right runoff scenario** (since 27 November 2026; `far_right_runoff_bias` in `forecast/simulate/runoff.py`).
+
+- In the three runoffs with a far-right finalist, that finalist did worse than the final-week polls each time: by 2.7 points in 2002, 5.3 in 2017 and 3.2 in 2022. The other trailing finalists did not (Royal +0.6 in 2007, Sarkozy +1.4 in 2012). Legislative second rounds show no such pattern: pollsters' far-right seat projections were far too low in 2022 and far too high in 2024.
+- Each time the far right was the underdog facing a broad front. In 2027 its candidate leads every polled runoff, which has never been observed.
+- So it is a scenario, not a fixed correction. With probability `far_right_runoff_probability` (0.5, **a judgment call**), a simulation is one where a far-right finalist facing another bloc falls short again.
+- The size is estimated: the past cases, pooled toward zero. Before 2027 that is 0.14 on the logit of the far-right share, give or take 0.07: about 3.5 points of vote share.
+- A backtest year uses only the cases before it (2017 knows only 2002).
+- The forecast reports the chance of winning in each half of the simulations (`far_right_runoff.csv`).
+
+### Turnout in the presidential election
+
+**Code:** `forecast/simulate/turnout.py`, `forecast/ingest/turnout.py`. **Parameters:** `turnout:` in `config/model.yaml`.
+
+The first round is forecast in shares of votes cast, so its turnout level does not change who qualifies. Turnout matters in the runoff, through *who* stays home.
+
+**First-round turnout** (voters / registered) is drawn per simulation.
+
+- The prior is a recency-weighted mean of past first rounds (each older election weighs 0.6 of the next). Its spread is that predictor's own forward error on earlier elections: about ±8 points at 90%.
+- Pollsters' abstention estimates update it. They are first corrected for how far off, and how variable, such estimates were at the same distance from the vote in earlier campaigns. They ran 2–4 points too high in the last week of 2012 and 2017, and up to 13 points too high two months out. So they carry little weight until the final days.
+
+**Runoff participation** comes from an abstention model. Each first-round electorate $k$ chooses between the finalists $A$, $B$ and not casting a valid vote:
+
+$$\eta_{kX} = \alpha - \beta\,|pos_k - pos_X| \pm \tfrac{gap}{2} + shift_k, \qquad P(X \mid k) = \frac{e^{\eta_{kX}}}{1 + e^{\eta_{kA}} + e^{\eta_{kB}}}$$
+
+- The finalists' own voters stay. A share $m$ of first-round non-voters casts a valid vote and splits like everyone else.
+- $pos$ is the bloc's left–right position. The radical left (LFI, FG, PCF) sits at −1.5, between the left and the far left (assumption; it improves the fit of past runoffs).
+- $gap$ is solved per runoff so that the model reproduces the expected result (the polling average, or the transfer model's prediction).
+- $\alpha$, $\beta$ and $m$ are fitted on the eleven runoffs of 1965–2022 (the ratio of valid votes between the two rounds) and on the 2012 and 2017 vote-transfer polls (how each electorate said it would split, including not voting). Fitted on elections before 2027: $\alpha$ = 1.86, $\beta$ = 1.18, $m$ = 0.27.
+- Predicting the participation of each of the six runoffs since 1995 from earlier runoffs only, the model's typical miss is 5.5%, against 7.6% for the average of past runoffs. Its largest misses are 2002 (10% too low) and 2017 (8% too high).
+
+**Shocks.** In a simulation $shift_k = \tau + \varepsilon_k$.
+
+- $\tau$ is one mobilisation shock shared by every electorate and by the non-voters. Its spread (0.48) is what past runoffs needed to match their actual participation: strongly negative in 1969 (the Communist boycott) and 2017 (record blank votes), positive in 2002 (mobilisation against Le Pen).
+- $\varepsilon_k$ is each electorate's own shock. Its spread (0.43) is the gap between modelled and polled non-voting by electorate in 2012 and 2017.
+- The shocks change who shows up, and therefore the result. The change in logit($A$'s share) is added to the runoff.
+- The generic runoff error is reduced by the average variance such shocks produced in past runoffs. The total stays calibrated on history, while a runoff that depends more on turnout than usual gets more uncertainty and one that depends less gets less.
+- Abstention polls for a matchup shift $\tau$ for that matchup.
+
+**What it shows.** Turnout matters where the voters most likely to stay home lean heavily to one finalist. In a Le Pen–Philippe runoff those are left-wing voters, who break about 6 to 1 for Philippe, so three more points of turnout cost Le Pen about 0.9 points of vote share, and her chance of winning that runoff is 58% when turnout disappoints against 42% when it surprises on the upside (forecast of 27 November 2026). A Le Pen–Mélenchon runoff is nearly insensitive, because the voters at the margin split more evenly.
+
+**Limits.**
+
+- No abstention polls exist yet for 2027, so today the turnout forecast rests on history alone.
+- No past runoff has opposed the far right and the radical left. The model treats one like any other runoff.
+- Abstention polls improved past turnout predictions only in the last days before a vote.
+- First-round turnout is assumed not to favour any candidate beyond what the vote-share errors already allow for.
 
 The outputs are the shares of simulations in which each thing happened:
 
 - P(runs), P(reaches runoff) and P(wins), per candidate and pooled by bloc;
 - vote-share quantiles;
 - matchup probabilities;
-- how often each outcome of the January decision occurred.
+- turnout in both rounds, and per runoff the first-named candidate's chance when turnout comes in below or above what the first round would normally give (`turnout.csv`, `turnout_matchups.csv`);
+- the same per candidate given each option of a scenario slot (for example each centre/right ballot), from only the simulations that drew it (`conditional.csv`, `PresSummary.conditional_matrix()`). Weighting the options by their probability gives back the headline numbers. The smallest options get the fewest simulations (1,600 for a 4% option), so their columns carry up to ±2.5 points of simulation noise;
+- with a mid-campaign decision, how often each of its outcomes occurred.
 
 The legislative simulation runs in chunks of 200 simulations at a time, to save memory. Each simulation goes through these steps.
 
 1. **Alliance scenario.** Draw one from `scenarios_legi.yaml`: left united or split.
 2. **First-round shares in all 577 seats.** Add the five error levels to each seat's ensemble mean.
-3. **Turnout.** Draw each seat's turnout.
+3. **Turnout.** Each seat's ratio of valid votes to registered voters is its 2024 ratio, moved so that the national figure equals the level set in `scenarios_legi.yaml` (50%, as after the 2012–2022 presidential elections; 2024 was a snap election at 65%). One shared factor per simulation moves all seats together (±12%). There is no seat-level turnout model.
 4. **Round-one outcome.** Apply the legal rules. A candidate wins outright with more than 50% of votes cast *and* at least 25% of registered voters. Anyone with at least 12.5% of registered voters goes through to round two; if fewer than two do, the top two go through.
 5. **Withdrawals.** Third-placed candidates withdraw with probabilities estimated from 2012–2024, moved together by a shared "front républicain" shock.
 6. **Second round.** Compute shares with a bloc-to-bloc transfer matrix, perturbed once per simulation.
@@ -242,7 +310,7 @@ Presidential results, 2002–2022 (115 snapshots):
 | Vote-share error, last two weeks | 1.1 points |
 | Vote-share error, 3–5 months out | 2.6 points |
 | 50% / 90% interval coverage | 44% / 85% |
-| Brier score, P(win) | 0.034 |
+| Brier score, P(win) | 0.029 |
 | Brier score, P(reach runoff) | 0.049 |
 
 The legislative model has only three test cycles, and its uncertainty ranges are still very wide.
@@ -251,9 +319,10 @@ The legislative model has only three test cycles, and its uncertainty ranges are
 
 The model separates estimated quantities from judgment calls, as the post does. The judgment calls live in files you are meant to edit, date and disclose:
 
-- `data/reference/scenarios_pres_2027.yaml`: the lineup probabilities and the January centrist rule;
-- `data/reference/scenarios_legi.yaml`: the legislative date, left alliance odds, incumbents' re-run rate and turnout spread;
+- `data/reference/scenarios_pres_2027.yaml`: the lineup probabilities, including which centre/right candidates make the ballot;
+- `data/reference/scenarios_legi.yaml`: the legislative date, left alliance odds, incumbents' re-run rate, and the turnout level and spread;
 - `data/reference/priors.yaml`: the weakly informative defaults used when no history exists yet.
+- `errors.far_right_runoff_probability` in `config/model.yaml`: the chance that the far right again does worse in the runoff than its polls (0.5).
 
 ## Known limitations
 

@@ -35,6 +35,7 @@ nowcast:
   nest_mu_prior:         {value: 0.6,   source: assumption, note: "nested-logit within-bloc substitution"}
   nest_mu_prior_sd:      {value: 0.2,   source: assumption}
   imputation_df:         {value: 4,     source: assumption}
+  nest_groups:           {value: ["CEN+DRO"], source: assumption, note: "blocs nested one level up; their λ is estimated (same prior as μ). Added 2026-11-26: polls testing one centre/right candidate showed the plain nested logit understating them by 4 pts"}
 
 horizon:
   move_a:                {value: 0.06,  source: estimated, note: "log-share sd at election eve"}
@@ -43,9 +44,17 @@ horizon:
 
 errors:
   nu_floor:              {value: 3,     source: post, note: "df = number of training cycles, floored"}
-  runoff_rho:            {value: 0.5,   source: assumption}
+  runoff_rho:            {value: 0.0,   source: estimated, note: "correlation of the runoff error with the finalists' first-round surprises. 0.5 (an assumption) until 2026-11-26: backtests at 0 / 0.25 / 0.5 / 0.75 gave Brier P(win) 0.0306 / 0.0330 / 0.0339 / 0.0344, 0 best in 4 of 5 elections; past runoff errors imply at most 0.3"}
   runoff_a:              {value: 0.10,  source: estimated, note: "logit sd of runoff error at eve"}
   runoff_b:              {value: 0.015, source: estimated}
+  runoff_by_polled:      {value: true,  source: estimated, note: "true: runoff_a/b become the prior curve for polled matchups, scaled to their past errors; unpolled matchups get their own flat scale. false: one scale fitted on all past runoffs (flat 0.25, dominated by the unpolled 2002 runoff; polled runoffs missed by 0.12-0.20). On since 2026-11-27: with runoff_net_of_first_round, Brier P(win) 0.0306 -> 0.0288, better in all five elections"}
+  runoff_unpolled:       {value: 0.40,  source: assumption, note: "prior logit sd for an unpolled matchup (2002, the one case: 0.46)"}
+  runoff_prior_weight:   {value: 2.0,   source: assumption, note: "the priors weigh as much as two past elections"}
+  runoff_net_of_first_round: {value: true, source: estimated, note: "true: the variance the simulated first round already carries into a runoff is taken out of its error, which was calibrated on the total. On since 2026-11-27 (a double count before)"}
+  far_right_runoff_probability: {value: 0.5, source: assumption, note: "JUDGMENT CALL, set 2026-11-27: chance that a far-right finalist again does worse in the runoff than the polls say. It happened in all three cases (2002 -2.7 pts, 2017 -5.3, 2022 -3.2 against final-week polls) but each time as the underdog facing a broad front; in 2027 Le Pen leads every polled runoff. 0 switches it off"}
+  far_right_runoff_prior_sd: {value: 0.15, source: assumption, note: "the size of the shortfall is the past cases pooled toward zero with this prior sd"}
+  far_right_runoff_noise:    {value: 0.13, source: estimated, note: "rms error of final-week runoff polls, 2007-2022"}
+  far_right_runoff_days:     {value: 7,    source: assumption}
 
 simulation:
   n_sims:                {value: 40000, source: post}
@@ -63,3 +72,26 @@ legislative:
   outright_registered:   {value: 0.25,  source: law}
   front_republicain_sd:  {value: 0.8,   source: assumption}
   chunk_size:            {value: 2000,  source: assumption}
+
+turnout:                 # presidential turnout model, added 2026-11-26
+  enabled:               {value: true,  source: assumption, note: "false: no turnout draws, runoff simulated as before"}
+  recency:               {value: 0.6,   source: assumption, note: "first-round turnout prior: each older election weighs 0.6 of the next; best of four predictors tested forward on 1988-2022"}
+  first_round_sd_default: {value: 0.30, source: estimated, note: "logit sd used with fewer than 3 forward errors"}
+  alpha_prior:           {value: 1.0,   source: assumption, note: "same priors as the runoff transfer model"}
+  alpha_prior_sd:        {value: 1.0,   source: assumption}
+  beta_prior:            {value: 1.0,   source: assumption}
+  beta_prior_sd:         {value: 0.5,   source: assumption}
+  radical_left_position: {value: -1.5,  source: assumption, note: "LFI/FG/PCF sit between the left (-1) and the far left (-2) for abstention; forward error of past runoff participation 6.0% -> 5.5%, and 2017 polls had 37% of Melenchon voters not voting against 20% of Hamon voters"}
+  mobilisation_prior:    {value: 0.20,  source: assumption, note: "share of first-round non-voters casting a valid runoff vote"}
+  mobilisation_prior_sd: {value: 0.5,   source: assumption}
+  ratio_sd:              {value: 0.03,  source: assumption, note: "fit scale of log(valid votes round 2 / round 1)"}
+  crosstab_none_sd:      {value: 0.4,   source: assumption, note: "fit scale of an electorate's logit(not voting) in transfer polls"}
+  crosstab_split_sd:     {value: 0.8,   source: assumption}
+  crosstab_days:         {value: 7,     source: assumption}
+  common_sd_floor:       {value: 0.2,   source: assumption}
+  electorate_sd_default: {value: 0.5,   source: estimated, note: "rms gap between modelled and polled non-voting of six electorates, 2012 and 2017"}
+  poll_window_days:      {value: 7,     source: estimated, note: "one week beat two on 2012-2022: older abstention polls are less accurate"}
+  poll_sd_floor:         {value: 0.15,  source: assumption, note: "two or three past campaigns cannot support less: 2022 runoff polls were 0.16 off a week out"}
+  poll_sd_default:       {value: 0.35,  source: assumption}
+  poll_within_sd:        {value: 0.20,  source: estimated, note: "spread of abstention polls within a week, 2012-2022"}
+  residual_floor:        {value: 0.5,   source: assumption}

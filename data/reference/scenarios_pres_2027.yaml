@@ -5,52 +5,80 @@
 # judgment calls (like the post's Montana independent scenario) and should be
 # set, dated and disclosed by whoever publishes a forecast.
 #
-# Timeline they were written against (event rows of the pinned Wikipedia
-# revision, 2026-09-28): Le Pen cleared to run on appeal and declared
-# (7 Jul 2026); Attal (22 May), Glucksmann (23 Aug), Faure (30 Aug), Roussel
-# (6 Sep), Zemmour (17 Sep) and Dupont-Aignan (19 Sep) declared; Philippe,
-# Retailleau, Mélenchon and Tondelier took part in the 27 Aug debate; the
-# Socialist primary has five candidates (Faure, Glucksmann, Guedj, Maurel,
-# Royal). Guedj and Maurel appear in no poll, so they cannot be forecast and
-# are left out of the primary slot.
+# Changed on 2026-11-26 (news up to that day; the polls were then the
+# 2026-11-24 revision of the Wikipedia page, and since 2026-11-27 the revision
+# of that day, which adds the OpinionWay poll of 25-26 November):
+#   * Centre and right: one draw over which of Philippe, Attal, Retailleau and
+#     Lisnard are on the April ballot (slot `centre_right`). It replaces
+#     Retailleau 0.85 and Lisnard 0.8 as independent draws with at least one
+#     of them running, and the 15 January rule that kept Philippe and Attal
+#     both in unless one polled above 15%. Under those, all four ran in 66% of
+#     simulations and never fewer than two. What changed:
+#       14 Nov  Larcher calls for a single candidate of the right and centre.
+#       17 Nov  Attal's, Retailleau's and Lisnard's teams agree in principle on
+#               an open two-round primary in January (17/24 or 24/31 Jan);
+#               details still being negotiated. Philippe refuses to take part.
+#       25 Nov  Lisnard turns down the televised debate Philippe offered him
+#               and asks for a vote instead.
+#     The probabilities follow three branches: the primary goes ahead and
+#     Philippe runs against its winner (50%); one candidate is left, because
+#     Philippe joins or one side withdraws after the primary or a debate (30%);
+#     the primary falls through (20%). They imply the primary winner is Lisnard
+#     45%, Attal 33%, Retailleau 21%, close to an Ifop poll of likely primary
+#     voters (13–18 Nov, reported: Lisnard 29, Philippe 28, Attal 25,
+#     Retailleau 18).
+#   * Tondelier 0.75 → 0.15. On 18 Nov she said she was "prête à travailler à
+#     une coalition autour de la candidature de Jean-Luc Mélenchon"; party
+#     members vote on 10–13 Dec between her own candidacy, backing Glucksmann
+#     or rallying to Mélenchon.
+#
+# Earlier timeline (event rows of the pinned revision, 2026-11-24): Le Pen
+# cleared to run on appeal and declared (7 Jul 2026); Attal (22 May), Roussel
+# (6 Sep) and Dupont-Aignan (19 Sep) declared; Glucksmann won the Socialist
+# primary (11 Oct); Polony (13 Oct) and Riner (9 Nov) declared; Zemmour and
+# Philippot made their candidacies official (10 Nov); Villepin made his
+# official (20 Nov); Ruffin withdrew (21 Nov). Poutou is in none of the
+# lineups pollsters test now. Philippot and Asselineau have columns on the
+# page but no poll values, so they cannot be forecast and are left out, as
+# Guedj and Maurel were. Riner and Polony still need 500 sponsorships; their
+# probabilities are placeholders (0.5 each until 2026-11-26, then 0.3 and 0.2).
 
 election: {id: 2027_pres, t1: 2027-04-18, t2: 2027-05-02}
-as_of: 2026-09-28
+as_of: 2026-11-26
 
-slots:                        # exactly one option per slot; null = nobody from this slot runs
+slots:                        # exactly one option per slot; null = nobody from this slot runs;
+                              # "A+B" puts several candidates on the ballot
   rn:
     LE_PEN_MARINE: 0.95
     BARDELLA_JORDAN: 0.05
-  socialist_primary:
-    GLUCKSMANN_RAPHAEL: 0.5
-    FAURE_OLIVIER: 0.4
-    ROYAL_SEGOLENE: 0.1
+  centre_right:               # who of the four is on the April ballot
+    PHILIPPE_EDOUARD+LISNARD_DAVID: 0.23     # primary held, Philippe runs against its winner (0.50)
+    PHILIPPE_EDOUARD+ATTAL_GABRIEL: 0.17
+    PHILIPPE_EDOUARD+RETAILLEAU_BRUNO: 0.10
+    PHILIPPE_EDOUARD: 0.14                   # one candidate left (0.30)
+    LISNARD_DAVID: 0.07
+    ATTAL_GABRIEL: 0.05
+    RETAILLEAU_BRUNO: 0.04
+    PHILIPPE_EDOUARD+RETAILLEAU_BRUNO+LISNARD_DAVID: 0.10   # primary falls through (0.20)
+    PHILIPPE_EDOUARD+ATTAL_GABRIEL+RETAILLEAU_BRUNO+LISNARD_DAVID: 0.10
 
 fixed:                        # run in every simulation
   - ARTHAUD_NATHALIE
   - ROUSSEL_FABIEN
   - MELENCHON_JEAN_LUC
-  - TONDELIER_MARINE
-  - RETAILLEAU_BRUNO
+  - GLUCKSMANN_RAPHAEL
+  - VILLEPIN_DOMINIQUE_DE
   - DUPONT_AIGNAN_NICOLAS
   - ZEMMOUR_ERIC
 
 optional:                     # independent yes/no draws
-  POUTOU_PHILIPPE: 0.6
-  VILLEPIN_DOMINIQUE_DE: 0.3
+  TONDELIER_MARINE: 0.15
+  RINER_TEDDY: 0.3
+  POLONY_NATACHA: 0.2
 
-constraints: []               # e.g. {if: {rn: BARDELLA_JORDAN}, exclude: [ZEMMOUR_ERIC]}
+constraints: []               # {if: {slot: option}, exclude: [...]} and/or {require_any: [...]}
 
-# Decisions taken later in the campaign from the polls at the time. Each
-# simulation draws the polling average on `date` (the part of the forecast
-# error realised by then), applies the rule, then simulates the rest of the
-# campaign from there. Pool members start in every lineup.
-decisions:
-  centrist:
-    date: 2027-01-15
-    pool: [PHILIPPE_EDOUARD, ATTAL_GABRIEL]
-    # the leading centrist runs alone if polling above 15%; otherwise the top
-    # two, plus anyone above 10%, run
-    threshold: 15
-    fallback_top: 2
-    fallback_above: 10
+# No mid-campaign decisions. The 15 January centrist rule (Philippe and Attal
+# decided by the polls) was replaced by the `centre_right` slot on 2026-11-26.
+# The format is still supported:
+#   decisions: {name: {date, pool: [...], threshold, fallback_top, fallback_above}}

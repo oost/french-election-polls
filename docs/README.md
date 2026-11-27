@@ -4,7 +4,7 @@ The code in `forecast/` forecasts French presidential and legislative elections.
 
 | Document | Read it to… |
 | --- | --- |
-| [Model overview](model-overview.md) | Follow the whole pipeline, from Wikipedia tables to "Le Pen wins 49%", and see what each stage assumes. |
+| [Model overview](model-overview.md) | Follow the whole pipeline, from Wikipedia tables to "Le Pen wins 69%", and see what each stage assumes. |
 | [File guide](file-guide.md) | Find the file that does something, and see which inputs you are expected to edit. |
 | [Bayesian modelling and Stan: a tutorial](bayesian-tutorial.md) | Learn the ideas the model relies on (priors, shrinkage, hierarchical models, random walks, MCMC, Stan, calibration), using this project's own models as the examples. |
 
@@ -14,9 +14,9 @@ The tutorial assumes you know regression, distributions and maximum likelihood, 
 
 ```bash
 python -m forecast ingest                 # rebuild the poll tables from the cached Wikipedia pages
-python -m forecast backtest --cycles 2002 2007 2012 2017 2022   # ≈ 40 min
-python -m forecast run --as-of 2026-09-28 # 2027 presidential forecast
+python -m forecast backtest --cycles 2002 2007 2012 2017 2022   # ≈ 10 min (≈ 40 the first time)
+python -m forecast run --as-of 2026-11-27 # 2027 presidential forecast
 python -m forecast legi-backtest          # legislative backtest
-python -m forecast legi --as-of 2026-09-28
+python -m forecast legi --as-of 2026-11-27
 pytest -q                                 # fast tests;  pytest -m slow  also fits the Stan models
 ```

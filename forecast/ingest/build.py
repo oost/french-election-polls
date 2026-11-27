@@ -17,6 +17,8 @@ def write_presidential() -> tuple[pl.DataFrame, pl.DataFrame, IngestReport]:
     long.write_parquet(POLLS_LONG)
     lineups_table(long).write_parquet(LINEUPS)
     events.write_parquet(EVENTS)
+    from forecast.ingest.turnout import write_turnout_tables
+    write_turnout_tables()      # abstention estimates and vote-transfer cross-tabs, for the turnout model
     return long, events, report
 
 

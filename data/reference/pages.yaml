@@ -47,7 +47,7 @@ pages:
   - key: pres2027
     election: 2027_pres
     title: Opinion_polling_for_the_2027_French_presidential_election
-    revision: 1377088060
+    revision: 1388214499
     rules:
       - {match: "Re-run of the 2022 election", exclude: true, note: "hypothetical re-run with Macron"}
       - {match: "^First round", round: first, kind: lineup}
@@ -81,5 +81,5 @@ pages:
   - key: leginext
     election: 2029_legi
     title: Next_French_legislative_election
-    revision: 1376910005
+    revision: 1383966200
     rules: legislative_default

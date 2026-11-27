@@ -18,6 +18,11 @@ class TestConfig:
         assert cfg.provenance["legislative.qualify_registered"] == "law"
         assert set(cfg.provenance.values()) <= {"post", "law", "assumption", "estimated"}
 
+    def test_nest_groups_load_as_a_hashable_tuple(self):
+        cfg = load_config()
+        assert cfg.nowcast.nest_groups == ("CEN+DRO",)
+        hash(cfg.nowcast)
+
     def test_unknown_parameter_rejected(self, tmp_path):
         bad = tmp_path / "m.yaml"
         bad.write_text("polls:\n  nonsense: {value: 1, source: post}\n")

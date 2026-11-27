@@ -292,6 +292,8 @@ constraints: []                 # e.g. if centre = X, exclude Y
 13. **Errors** (logit scale, `error_meta.stan`).
     - **First round:** a centred bloc shock, plus a candidate error that multiplies σ̄ by m(n, disagreement).
     - **Runoff:** a matchup shock correlated (ρ, prior 0.5) with the RN bloc's first-round shock. This mirrors the post's national shock shared across chambers.
+      - *Since 2026-11-26 ρ = 0:* implemented as a correlation with the finalists' first-round surprises, it scored worse in the backtest at every value above 0.
+      - *Since 2026-11-27:* the runoff error is scaled separately for polled and unpolled matchups, shrinks toward the vote, and is net of the variance the simulated first round already carries.
     - Each level's σ_ℓ(h) = a_ℓ + b_ℓ·√h.
     - Student-t with ν = the number of training cycles, floor 3.
 
@@ -357,6 +359,7 @@ constraints: []                 # e.g. if centre = X, exclude Y
 
 8. **Rounds** (`simulate/rules.py`).
    - **Turnout:** logit(turnout_j) = logit(national turnout) + the seat's turnout lean (last two legislative first rounds, 80/20) + a national shock + seat noise. National turnout comes from pollsters' turnout columns or a prior by election type. Expressed votes = turnout × (1 − blank/null) × registered voters.
+     - *Implemented more simply (2026-11-26):* each seat keeps its 2024 ratio of valid votes to registered voters, moved to the national level set in `scenarios_legi.yaml`, with one shared factor per simulation. The seat-level model above was not built.
    - **Outright first-round win:** > 50% of expressed votes and ≥ 25% of registered voters.
    - **Runoff qualification:** ≥ 12.5% of registered voters; if fewer than two qualify, the top two go through.
    - **Withdrawals** (*désistements*):
@@ -459,6 +462,7 @@ The design pass drafted Stan code for all three models. That code goes into M4 (
 8. Error levels are remapped. The post's chamber level has no counterpart, except in an optional joint presidential–legislative run.
 9. There are few training cycles (5 presidential, 4 legislative). That means fat tails and more reliance on `priors.yaml`.
 10. Parameters the post leaves unspecified (the decay ramp, the prior-weight formula, the sample-size weight) are tuned, which adds researcher degrees of freedom. Each carries a provenance tag in `config/model.yaml`.
+11. The presidential simulation has a turnout model, which the post has no counterpart for (added 2026-11-26). First-round turnout is drawn from past elections and abstention polls. In the runoff, mobilisation shocks fitted on the 1965–2022 runoffs move participation and the result; the generic runoff error is reduced by the variance they carried on average in the past. See `docs/model-overview.md` › Turnout in the presidential election.
 
 ## Milestones (each ends runnable and tested)
 

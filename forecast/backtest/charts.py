@@ -3,9 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
@@ -39,14 +36,13 @@ def error_by_horizon(archive: pl.DataFrame, path: Path) -> Path:
               (pl.col("share_ens") - pl.col("result_share")).abs().mean().alias("ensemble"))
           .sort("days_out"))
     fig, ax = plt.subplots(figsize=(8, 4.5))
+    # legend only: the polls and ensemble lines nearly coincide, so direct labels would collide
     for k, color in SERIES.items():
         ax.plot(df["days_out"], df[k], color=color, linewidth=2, label=k)
-        ax.annotate(k, (df["days_out"][-1], df[k][-1]), xytext=(6, 0), textcoords="offset points",
-                    color=INK, fontsize=9, va="center")
     ax.invert_xaxis()
     _style(ax, "Out-of-sample error by days to the first round", "days before the first round",
            "mean absolute error (points)")
-    ax.legend(frameon=False, loc="upper right")
+    ax.legend(frameon=False, loc="center right")   # the empty band between the two groups of lines
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)

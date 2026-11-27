@@ -237,12 +237,13 @@ def _extract_numeric(value: Any) -> float | None:
 
 
 def _parse_sample_size(value: Any) -> int | None:
-    """Sample sizes use thousands separators ("1,351"), which `_extract_numeric`
-    would truncate at the comma."""
+    """Sample sizes use thousands separators ("1,351", "1 351" or the
+    continental "1.351"), which `_extract_numeric` would truncate at the
+    separator. A dot is a separator only before exactly three digits."""
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return None
     digits = re.sub(r"\[.*?\]", "", str(value))
-    match = re.search(r"\d[\d,\s ]*", digits)
+    match = re.search(r"\d(?:[\d,\s ]|\.(?=\d{3}(?!\d)))*", digits)
     if not match:
         return None
     n = int(re.sub(r"\D", "", match.group()))

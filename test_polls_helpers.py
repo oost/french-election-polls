@@ -99,6 +99,13 @@ class TestParseSampleSize:
     def test_thousands_separator(self):
         assert _parse_sample_size("1,351") == 1351
 
+    def test_dot_thousands_separator(self):
+        # continental notation, as in the Ifop 25–29 Sep 2026 rows ("1.393")
+        assert _parse_sample_size("1.393") == 1393
+        assert _parse_sample_size("12.005") == 12005
+        # a dot not followed by exactly three digits is not a separator
+        assert _parse_sample_size("1.5") == 1
+
     def test_plain_and_footnote(self):
         assert _parse_sample_size("957") == 957
         assert _parse_sample_size("12,542[a]") == 12542

@@ -18,6 +18,7 @@ from functools import lru_cache
 import numpy as np
 import polars as pl
 import yaml
+from scipy.optimize import brentq
 
 from forecast import paths
 from forecast.config import Config, default_config
@@ -425,18 +426,43 @@ class LegiSummary:
     seat_probs: pl.DataFrame
     national: dict[str, float]
     last_poll: date | None = None
+    turnout: float | None = None           # assumed national valid votes / registered voters
+    turnout_last: float | None = None      # the same at the last election (2024)
+    triangulaires: tuple[float, float, float] | None = None   # three-way runoffs: median, 5%, 95%
 
     def report(self) -> str:
         lines = [f"French legislative election (first round assumed {self.election_t1}) — forecast as of {self.as_of}",
                  f"National polling average: " + ", ".join(f"{u} {100 * s:.1f}%" for u, s in
                                                           sorted(self.national.items(), key=lambda x: -x[1])),
                  f"Latest national legislative poll: {self.last_poll}",
-                 f"Alliance scenarios: {self.scenarios}", "",
-                 f"{'unit':<6}{'mean seats':>11}{'90% range':>14}{'P(289+)':>9}{'P(largest)':>12}"]
+                 f"Alliance scenarios: {self.scenarios}"]
+        if self.turnout is not None:
+            lines.append(f"Turnout: valid votes assumed at {self.turnout:.0%} of registered voters "
+                         f"(2024: {self.turnout_last:.0%})")
+        if self.triangulaires is not None:
+            med, lo, hi = self.triangulaires
+            lines.append(f"Three-way runoffs after withdrawals: median {med:.0f} seats (90% range {lo:.0f}–{hi:.0f})")
+        lines += ["",
+                  f"{'unit':<6}{'mean seats':>11}{'90% range':>14}{'P(289+)':>9}{'P(largest)':>12}"]
         for r in self.totals.iter_rows(named=True):
             rng = f"{r['q05']:.0f}–{r['q95']:.0f}"
             lines.append(f"{r['unit']:<6}{r['mean_seats']:>11.0f}{rng:>14}{r['p_majority']:>9.1%}{r['p_largest']:>12.1%}")
         return "\n".join(lines)
+
+
+def scale_turnout(ratio: dict[str, float], registered: dict[str, float], level: float) -> dict[str, float]:
+    """Each seat's valid votes / registered voters, moved so the national
+    figure equals `level`. The shift is the same for every seat on the odds
+    scale, so seats keep their order and stay between 0 and 1."""
+    seats = list(ratio)
+    r = np.array([ratio[s] for s in seats])
+    w = np.array([registered[s] for s in seats], float)
+
+    def national(shift: float) -> float:
+        return float(np.average(1 / (1 + (1 - r) / r * np.exp(-shift)), weights=w))
+
+    shift = brentq(lambda x: national(x) - level, -6, 6)
+    return dict(zip(seats, (1 / (1 + (1 - r) / r * np.exp(-shift))).tolist()))
 
 
 def run_legislative_forecast(as_of: date | None = None, n_sims: int | None = None, cfg: Config | None = None,
@@ -469,9 +495,12 @@ def run_legislative_forecast(as_of: date | None = None, n_sims: int | None = Non
                            {u: float(np.hypot(sd, grow)) for u, sd in zip(avg["option_id"], avg["sd_log"])},
                            int(avg["n_polls"][0]))
     turnout, _ = D.legi_results(2024, "t1")
-    ratio = dict(zip(turnout["seat"], (turnout["exprimes"] / turnout["inscrits"]).to_list()))
+    last_level = float(turnout["exprimes"].sum() / turnout["inscrits"].sum())
+    level = spec["turnout"].get("expressed_over_registered") or last_level
+    ratio = scale_turnout(dict(zip(turnout["seat"], (turnout["exprimes"] / turnout["inscrits"]).to_list())),
+                          dict(zip(turnout["seat"], turnout["inscrits"])), level)
     n = n_sims or cfg.simulation.n_sims
-    all_totals, by_scen, probs = [], {}, []
+    all_totals, by_scen, probs, tri = [], {}, [], []
     scen_p = {k: v["probability"] for k, v in spec["alliances"].items()}
     for k, (name, p) in enumerate(scen_p.items()):
         split = name == "split_left"
@@ -492,12 +521,14 @@ def run_legislative_forecast(as_of: date | None = None, n_sims: int | None = Non
                                     front_republicain_sd=spec["withdrawals"]["front_republicain_sd"])
         by_scen[name] = sims.summary(cfg.legislative.majority_seats)
         all_totals.append(sims.totals)
+        tri.append(sims.n_triangulaires)
         probs.append((p, sims.seat_win_prob, sims.seats))
     totals = np.vstack(all_totals)
     pooled = LegiSims(probs[0][2], sum(p * w for p, w, _ in probs), totals, np.zeros(1), np.zeros(1))
     seat_probs = pl.DataFrame({"seat": pooled.seats, **{u: pooled.seat_win_prob[:, i] for i, u in enumerate(UNITS)}})
     summary = LegiSummary(as_of, t1, scen_p, pooled.summary(cfg.legislative.majority_seats), by_scen, seat_probs,
-                          base.shares, last_poll=nat_polls["midpoint"].max())
+                          base.shares, last_poll=nat_polls["midpoint"].max(), turnout=level, turnout_last=last_level,
+                          triangulaires=tuple(float(q) for q in np.quantile(np.concatenate(tri), [0.5, 0.05, 0.95])))
     if write:
         out = paths.OUTPUTS / f"legi_{as_of.isoformat()}"
         out.mkdir(parents=True, exist_ok=True)
